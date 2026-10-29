@@ -15,8 +15,16 @@
   },
   "release_checks": {
     "package_verification_tests": "passed",
-    "clean_arch_lifecycle": "see Actions for exact tagged commit",
-    "release_attestation": "must be verified after publication"
+    "clean_arch_lifecycle": "passed: https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40934628583",
+    "release_attestation": "gh release verify passed after publication",
+    "tag": "v0.1.0-rc.1",
+    "commit": "de6df4376399d02ecd6aada9afe17b76218a5b7c",
+    "immutable": true,
+    "tagged_release_workflow": "passed: https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40935114203",
+    "public_client_download": "passed: release attestation, manifest/package asset attestations, hash, byte count and PKGINFO",
+    "package_sha256": "16107087a122881ea5bae364f190609c27ee813bb26eb43a936242ca3749b9fe",
+    "stable_channel": "no-release; candidate intentionally excluded",
+    "host_package_installation": "not performed; private-prefix deployment retained"
   },
   "acceptance_pending": [
     "Exact candidate GUI official-device transfer matrix",

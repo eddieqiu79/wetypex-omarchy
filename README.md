@@ -109,6 +109,10 @@ Building and running the offline tests does not require an account, device pairi
 
 ## Validation Status
 
+The [0.1.0-rc.1 release](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.1) at `de6df4376399d02ecd6aada9afe17b76218a5b7c` passed [clean Arch install/upgrade/rollback checks](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40934628583) and the [tagged release workflow](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40935114203). Its public download passed GitHub release/asset attestation verification and package integrity/metadata checks through the new client. See [the machine-readable record](docs/native-release-validation.json). Native-GUI real-device acceptance remains pending; it is a preview release.
+
+Historical source/package evidence:
+
 A [clean Arch package build and install/remove check](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40857038300) passed for commit `b88e6e87988685ba811c9c04e8048293651e18bc`. See [Arch installation](docs/ARCH.md) for the artifact, checksums, and validation boundaries. This does not certify later commits or real desktop/device behavior.
 
 The published source snapshot has passed:
