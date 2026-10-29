@@ -77,6 +77,10 @@ The Mac ↔ iPhone file copy-and-paste behavior observed during testing used App
 - Service templates are included, but building or staging the project does not automatically enable services or replace an existing input method.
 - Cross-device clipboard tools should be coordinated to avoid competing writes and ambiguous synchronization results.
 
+## Installation Status
+
+This repository does not yet provide a validated one-command installer or fork-specific package. The existing upstream AUR recipe downloads upstream releases, not this fork. Start with [Installation and agent handoff](docs/INSTALL.md) and the read-only `python3 tools/preflight.py`; building or staging does not activate the input method.
+
 ## Building and Offline Tests
 
 The project retains the upstream CMake structure. Build dependencies include Fcitx5 development files, LibIME, Qt with WebEngine, Clang/libc++, Python 3, and cryptography. HEIF/AVIF conversion also requires PyGObject, GdkPixbuf, and the appropriate image format plugins.
