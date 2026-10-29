@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+"""Discover, verify and install this fork's immutable Arch releases.
+
+No command obtains the proprietary runtime, activates services or restarts input.
+Installation requires --confirm and pacman's interactive authorization.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import runpy
+import shutil
+import subprocess
+import tempfile
+
+REPO = 'eddieqiu79/wetypex-omarchy'
+PREFIX = Path(__file__).resolve().parents[1]
+
+def policy():
+    installed = PREFIX / 'bin/fcitx5-wetypex-update'
+    source = PREFIX / 'scripts/fcitx5-wetypex-update.sh.in'
+    return runpy.run_path(str(installed if installed.is_file() else source))
+
+def run(args, timeout=120):
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+    if result.returncode:
+        # gh errors may contain temporary signed URLs. Never forward raw output.
+        raise ValueError('Command failed: ' + ' '.join(args[:3]) + '; check authentication, network and tool support.')
+    return result.stdout
+
+def get_release(p, tag, channel):
+    if not re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.[1-9]\d*)?', tag):
+        raise ValueError('Invalid release tag')
+    release = p['fetch_json'](f'https://api.github.com/repos/{REPO}/releases/tags/{tag}')
+    if release.get('tag_name') != tag or release.get('draft') or release.get('immutable') is not True:
+        raise ValueError('Release must be published and immutable')
+    if bool(release.get('prerelease')) != ('-rc.' in tag) or (channel == 'stable' and release.get('prerelease')):
+        raise ValueError('Preview requires --channel preview')
+    return release
+
+def verify_package(package, manifest):
+    expected = manifest['package']
+    if package.stat().st_size != expected['size']:
+        raise ValueError('Package size mismatch')
+    with package.open('rb') as f:
+        if hashlib.file_digest(f, 'sha256').hexdigest() != expected['sha256']:
+            raise ValueError('Package digest mismatch')
+    data = run(['bsdtar', '-xOf', str(package), '.PKGINFO']).decode()
+    info = dict(line.split(' = ', 1) for line in data.splitlines() if ' = ' in line)
+    if (info.get('pkgname'), info.get('pkgver'), info.get('arch')) != ('wetypex-omarchy', expected['pacman_version'], 'x86_64'):
+        raise ValueError('Package identity/version/architecture mismatch')
+
+def installed_version():
+    result = subprocess.run(['pacman', '-Q', 'wetypex-omarchy'], capture_output=True, text=True)
+    return result.stdout.split()[1] if result.returncode == 0 else None
+
+def download(p, tag, channel, directory):
+    release = get_release(p, tag, channel)
+    # Fail before downloading if this gh version cannot verify release attestations.
+    run(['gh', 'release', 'verify', '--help'])
+    run(['gh', 'release', 'verify-asset', '--help'])
+    run(['gh', 'release', 'verify', tag, '--repo', REPO])
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    destination = directory / tag
+    if destination.exists():
+        raise ValueError('Destination already exists; keep it for recovery and select a new download directory')
+    with tempfile.TemporaryDirectory(prefix='.wetypex-download-', dir=directory) as temporary:
+        work = Path(temporary)
+        run(['gh', 'release', 'download', tag, '--repo', REPO, '--dir', str(work), '--pattern', 'release-manifest.json'])
+        manifest_path = work / 'release-manifest.json'
+        run(['gh', 'release', 'verify-asset', tag, str(manifest_path), '--repo', REPO])
+        manifest = json.loads(manifest_path.read_text())
+        package = p['validate_manifest'](manifest, tag)
+        if manifest.get('runtime_version') != '2.2.3.657':
+            raise ValueError('Runtime requirement changed; manual migration review required')
+        asset = next((a for a in release.get('assets', []) if a.get('name') == package['name']), {})
+        if asset.get('size') != package['size']:
+            raise ValueError('Release asset metadata mismatch')
+        run(['gh', 'release', 'download', tag, '--repo', REPO, '--dir', str(work), '--pattern', package['name']], timeout=600)
+        file = work / package['name']
+        run(['gh', 'release', 'verify-asset', tag, str(file), '--repo', REPO], timeout=180)
+        verify_package(file, manifest)
+        # Publish complete verified files only. Partial downloads stay private and are removed.
+        work.rename(destination)
+    return destination / package['name'], manifest
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=('check', 'download', 'install'))
+    parser.add_argument('--channel', choices=('stable', 'preview'), default='stable')
+    parser.add_argument('--tag', help='Exact immutable release; default is newest in the selected channel')
+    parser.add_argument('--directory', type=Path, default=Path(os.environ.get('XDG_CACHE_HOME', Path.home()/'.cache'))/'wetypex-omarchy/packages')
+    parser.add_argument('--confirm', action='store_true', help='Authorize the adapter package transaction only; pacman still asks interactively')
+    parser.add_argument('--allow-downgrade', action='store_true', help='Explicit recovery using an older compatible release')
+    args = parser.parse_args(argv)
+    if os.geteuid() == 0:
+        parser.error('Run as your ordinary desktop user; only pacman is elevated')
+    if args.action == 'install' and not args.confirm:
+        parser.error('install requires --confirm; download does not install')
+    if platform.machine() != 'x86_64': parser.error('Only x86_64 is supported')
+    try:
+        p = policy()
+        version_file = PREFIX/'share/fcitx5-wetypex/VERSION'
+        if not version_file.is_file(): version_file = PREFIX/'VERSION'
+        current = version_file.read_text().strip() if version_file.is_file() else '0.0.0'
+        result = p['check_releases'](args.channel, current, '2.2.3.657', 'x86_64')
+        if args.action == 'check':
+            print(json.dumps(result)); return 0
+        for command in ('gh', 'bsdtar'):
+            if not shutil.which(command): raise ValueError('Install the required tool first: ' + command)
+        tag = args.tag or result.get('tag')
+        if not tag: raise ValueError('No release exists in this channel; no package downloaded')
+        if args.action == 'install':
+            if not shutil.which('pacman') or not shutil.which('vercmp') or not shutil.which('sudo'):
+                raise ValueError('Arch pacman, vercmp and sudo are required')
+            if (Path.home()/'.local/lib/fcitx5/wetypex.so').exists():
+                raise ValueError('Private-prefix plugin detected; review migration before installing a system package')
+            previous = installed_version()
+            # Resolve and compare before the download/transaction, including explicitly requested old tags.
+            target = '1:' + tag[1:].replace('-rc.', 'rc') + '-1'
+            if previous and int(run(['vercmp', target, previous]).decode()) < 0 and not args.allow_downgrade:
+                raise ValueError('Refusing downgrade; recovery requires --allow-downgrade')
+        package, manifest = download(p, tag, args.channel, args.directory.expanduser().resolve())
+        print(json.dumps({'status': 'verified', 'tag': tag, 'package': str(package), 'commit': manifest['commit']}), flush=True)
+        if args.action == 'install':
+            print(run(['pacman', '-Qip', str(package)]).decode(), flush=True)
+            print('Installing the adapter only. Finish active input/transfers first. Services, runtime and pairing are unchanged.', flush=True)
+            rc = subprocess.run(['sudo', 'pacman', '-U', str(package)]).returncode
+            if rc: return rc
+            print('Package installed. Running processes still need an explicit restart after active work finishes. See docs/ARCH.md.')
+        return 0
+    except (ValueError, OSError, subprocess.SubprocessError, KeyError, TypeError):
+        # Do not expose signed URLs or response bodies. Provide actionable categories above via safe local messages.
+        import sys
+        error = sys.exception()
+        message = str(error) if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError) else 'Network, verification or local tool failure; no unverified package was installed'
+        print('Package operation failed: ' + message, file=sys.stderr)
+        return 1
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -30,7 +30,7 @@ if(NOT WETYPE_QT_VERSION MATCHES "^(AUTO|5|6)$")
   message(FATAL_ERROR "WETYPE_QT_VERSION must be AUTO, 5 or 6")
 endif()
 if(NOT WETYPE_QT_VERSION STREQUAL "5")
-  find_package(Qt6 6.2 QUIET COMPONENTS Widgets Gui DBus Network Svg WebEngineWidgets)
+  find_package(Qt6 6.2 QUIET COMPONENTS Widgets Gui DBus Network Svg WebEngineWidgets Concurrent)
   find_package(Fcitx5Qt6WidgetsAddons QUIET)
   if(TARGET Qt6::WebEngineWidgets AND TARGET Qt6::Svg AND TARGET Fcitx5Qt6::WidgetsAddons)
     set(WETYPE_QT_PACKAGE Qt6)
@@ -40,7 +40,7 @@ if(NOT WETYPE_QT_VERSION STREQUAL "5")
   endif()
 endif()
 if(NOT WETYPE_QT_PACKAGE)
-  find_package(Qt5 5.12 REQUIRED COMPONENTS Widgets Gui DBus Network Svg WebEngineWidgets)
+  find_package(Qt5 5.12 REQUIRED COMPONENTS Widgets Gui DBus Network Svg WebEngineWidgets Concurrent)
   find_package(Fcitx5Qt5WidgetsAddons REQUIRED)
   set(WETYPE_QT_PACKAGE Qt5)
   set(WETYPE_UI_QT_MAJOR 5)
@@ -78,12 +78,13 @@ if(NOT WETYPE_LAYER_SHELL STREQUAL "OFF")
   endif()
 endif()
 add_executable(fcitx5-wetypex-settings src/settings/main.cpp)
-target_link_libraries(fcitx5-wetypex-settings PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::DBus ${WETYPE_QT_PACKAGE}::Network ${WETYPE_QT_PACKAGE}::Svg)
+target_link_libraries(fcitx5-wetypex-settings PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::DBus ${WETYPE_QT_PACKAGE}::Network ${WETYPE_QT_PACKAGE}::Svg ${WETYPE_QT_PACKAGE}::Concurrent)
 target_compile_definitions(fcitx5-wetypex-settings PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
   WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
   WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-transfer"
   WETYPE_UPDATE="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-update"
+  WETYPE_PACKAGE_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-omarchy-package"
   "WETYPE_VERSION=\"Omarchy ${WETYPE_OMARCHY_VERSION} (engine ${PROJECT_VERSION})\"")
 add_executable(fcitx5-wetypex-clipboard-set src/clipboard/main.cpp)
 target_link_libraries(fcitx5-wetypex-clipboard-set PRIVATE ${WETYPE_QT_PACKAGE}::Gui PkgConfig::WETYPE_WAYLAND)

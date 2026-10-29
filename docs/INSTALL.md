@@ -3,6 +3,8 @@
 Start with [Arch / Omarchy package installation](ARCH.md) for the fork-specific source exporter, package recipe, explicit user-service activation, update/removal and rollback boundaries. The sections below retain general environment and acceptance guidance; they are not a second installer.
 
 
+Start with [verified Release installation](RELEASE-INSTALL.md) for prebuilt packages and update discovery. The native desktop applications are described in [DESKTOP.md](DESKTOP.md).
+
 ## Status
 
 This repository provides source and CI-built Arch adapter packages, not a fully validated unattended desktop installer. The existing `packaging/aur/PKGBUILD` downloads upstream WeTypeX releases and **does not install this fork's changes**. Other upstream package recipes are retained for reference and have not been validated as fork-specific releases. Do not substitute an upstream package and claim this fork is installed.
@@ -32,7 +34,7 @@ This repository currently provides a sync-service **template**, not an activated
 
 Report build/test results separately from local desktop testing and official-device tests. Verify actual Chinese input; text and images in each Linux ↔ Mac/iPhone direction; and explicit file-transfer invitation, acceptance, connection, and saved result. Use synthetic data; compare hashes when both sides allow access. iPhone keyboard availability is not automatically the same as the iOS global clipboard. Direct file copy/paste is not implemented.
 
-There is currently no general, tested uninstall or rollback command. Before installing anything, record the package owner and paths, original input method selection, service states, and any planned backups; obtain permission for changes. Remove or restore only artifacts created or modified by the installation, and preserve account and dictionary data unless the user explicitly requests otherwise. Existing maintenance-machine commands are described in [OMARCHY-OPERATIONS.md](OMARCHY-OPERATIONS.md); they are not universal instructions for a fresh machine.
+Package deactivation/removal is documented in ARCH.md; published-package downgrade requires an explicit old tag and compatibility review. No universal desktop or state rollback is claimed. Before installing anything, record the package owner and paths, original input method selection, service states, and any planned backups; obtain permission for changes. Remove or restore only artifacts created or modified by the installation, and preserve account and dictionary data unless the user explicitly requests otherwise. Existing maintenance-machine commands are described in [OMARCHY-OPERATIONS.md](OMARCHY-OPERATIONS.md); they are not universal instructions for a fresh machine.
 
 ## Remaining release work
 

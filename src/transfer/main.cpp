@@ -1,26 +1,42 @@
+#include "../common/desktop_style.hpp"
 #include "../common/qt_helpers.hpp"
+#include "../common/single_instance.hpp"
 #include <QAbstractSocket>
 #include <QApplication>
+#include <QCloseEvent>
+#include <QComboBox>
+#include <QDesktopServices>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QListWidget>
 #include <QMenu>
+#include <QMessageBox>
+#include <QMimeData>
 #include <QNetworkInterface>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QQueue>
 #include <QSaveFile>
+#include <QScrollArea>
+#include <QSet>
+#include <QShortcut>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QToolButton>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <functional>
@@ -186,220 +202,194 @@ GrpcInfo parseGrpcInfo(const QByteArray &data) {
 class TransferWindow final : public QWidget {
 public:
   TransferWindow() {
-    setWindowTitle(QStringLiteral("WeTypeX 隔空传送"));
-    setWindowIcon(QIcon::fromTheme(QStringLiteral("fcitx5-wetypex")));
-    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
-    resize(317, 519);
-    setStyleSheet(QStringLiteral(
-        "QWidget{background:#f7f7f7;color:#202020;font-size:14px}"
-        "QLabel{background:transparent;}"
-        "QLabel#title{font-size:18px;font-weight:500}"
-        "QLabel#hint{color:#8c8c8c;font-size:13px}"
-        "QPushButton{border:0;border-radius:5px;padding:9px "
-        "18px;background:#18c690;color:white}"
-        "QPushButton:disabled{background:#b7e9da;color:#f7fffc}"
-        "QProgressBar{border:0;background:#e9e9e9;border-radius:2px;height:4px}"
-        "QProgressBar::chunk{background:#18c690;border-radius:2px}"));
-    auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(12);
-    home_ = new QWidget;
-    auto *homeLayout = new QVBoxLayout(home_);
-    homeLayout->setContentsMargins(16, 14, 16, 18);
-    homeLayout->setSpacing(12);
-    auto *heading = new QHBoxLayout;
-    heading->addSpacing(28);
-    auto *homeTitle = new QLabel(QStringLiteral("隔空传送"));
-    homeTitle->setAlignment(Qt::AlignCenter);
-    heading->addWidget(homeTitle, 1);
-    auto sourceButton = [](const QString &icon, const QString &accessible) {
-      auto *button = new QToolButton;
-      button->setIcon(QIcon(transferAsset(QStringLiteral("transfer-icons"),
-                                          icon + QStringLiteral(".svg"))));
-      button->setIconSize({18, 18});
-      button->setFixedSize(28, 28);
-      button->setAccessibleName(accessible);
-      button->setToolTip(accessible);
-      button->setStyleSheet(QStringLiteral(
-          "QToolButton{border:0;background:transparent;}"
-          "QToolButton:hover{background:#e9e9e9;border-radius:4px;}"));
-      return button;
-    };
-    auto *settings = sourceButton(QStringLiteral("icon_statusbar_setup"),
-                                  QStringLiteral("设置"));
-    auto *close =
-        sourceButton(QStringLiteral("icon_tips_close"), QStringLiteral("关闭"));
-    heading->addWidget(settings);
-    heading->addWidget(close);
-    homeLayout->addLayout(heading);
-    auto *section = new QLabel(QStringLiteral("我的设备"));
-    section->setStyleSheet(
-        QStringLiteral("color:#888;font-size:13px;margin-left:14px;"));
-    homeLayout->addWidget(section);
-    auto card = [sourceButton](const QString &icon, const QString &name,
-                               const QString &detail) {
-      auto *button = new QPushButton;
-      button->setFixedHeight(62);
-      button->setStyleSheet(QStringLiteral(
-          "QPushButton{background:white;border:0;border-radius:10px;"
-          "text-align:left;color:#202020;padding:0;}"
-          "QPushButton:hover{background:#fbfbfb;}"));
-      auto *row = new QHBoxLayout(button);
-      row->setContentsMargins(15, 0, 10, 0);
-      auto *image = new QLabel;
-      image->setPixmap(QIcon(transferAsset(QStringLiteral("transfer-icons"),
-                                           icon + QStringLiteral(".svg")))
-                           .pixmap(28, 28));
-      row->addWidget(image);
-      auto *labels = new QVBoxLayout;
-      labels->setSpacing(2);
-      labels->addStretch();
-      labels->addWidget(new QLabel(name));
-      auto *subtitle = new QLabel(detail);
-      subtitle->setStyleSheet(QStringLiteral("color:#999;font-size:12px;"));
-      labels->addWidget(subtitle);
-      labels->addStretch();
-      row->addLayout(labels, 1);
-      auto *arrow = sourceButton(QStringLiteral("icon_tips_arrow"),
-                                 QStringLiteral("进入"));
-      arrow->setIconSize({8, 14});
-      arrow->setStyleSheet(QStringLiteral(
-          "QToolButton{border:0;background:#f7f7f7;border-radius:14px;}"));
-      arrow->setAttribute(Qt::WA_TransparentForMouseEvents);
-      row->addWidget(arrow);
-      return button;
-    };
-    auto *myDevices = card(QStringLiteral("icon_transmission_equipment"),
-                           QStringLiteral("关联我的其他设备"),
-                           QStringLiteral("关联后即可互传文件"));
-    auto *others =
-        card(QStringLiteral("icon_transmission_others"),
-             QStringLiteral("传给其他人"), QStringLiteral("查看我的二维码"));
-    homeLayout->addWidget(myDevices);
-    homeLayout->addWidget(others);
-    homeLayout->addStretch();
-    layout->addWidget(home_);
-    title_ = new QLabel(QStringLiteral("我的二维码"));
-    title_->setObjectName(QStringLiteral("title"));
-    title_->setAlignment(Qt::AlignCenter);
+    setWindowTitle(QStringLiteral("WeTypeX · 文件传输"));
+    setMinimumSize(520, 360);
+    resize(900, 720);
+    setAcceptDrops(true);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    auto *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    auto *body = new QWidget;
+    body->setMinimumSize(650, 600);
+    scroll->setWidget(body);
+    outer->addWidget(scroll);
+    auto *layout = new QVBoxLayout(body);
+    layout->setContentsMargins(24, 20, 24, 20);
+    layout->setSpacing(14);
+    title_ = new QLabel("文件传输");
+    title_->setObjectName("title");
+    layout->addWidget(title_);
+    auto *hint = new QLabel("选择设备和文件，再发起连接。连接期间，对端发送的文"
+                            "件将保存到接收目录。");
+    hint->setWordWrap(true);
+    hint->setObjectName("hint");
+    layout->addWidget(hint);
+    auto *devices = new QHBoxLayout;
+    peers_ = new QComboBox;
+    peers_->setObjectName("peers");
+    peers_->setMinimumWidth(220);
+    peers_->addItem("请刷新关联设备", QString());
+    refresh_ = new QPushButton("刷新设备");
+    refresh_->setObjectName("refresh");
+    auto *settings = new QPushButton("设置 / 关联设备");
+    devices->addWidget(peers_, 1);
+    devices->addWidget(refresh_);
+    devices->addWidget(settings);
+    layout->addLayout(devices);
+    files_ = new QListWidget;
+    files_->setObjectName("files");
+    files_->setMinimumHeight(100);
+    files_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    layout->addWidget(
+        new QLabel("待发送文件 · 支持拖放，选择文件不会立即发送"));
+    layout->addWidget(files_, 1);
+    auto *selection = new QHBoxLayout;
+    auto *choose = new QPushButton("选择文件…");
+    choose->setObjectName("choose");
+    auto *remove = new QPushButton("移除选中");
+    send_ = new QPushButton("连接并发送");
+    send_->setObjectName("send");
+    selection->addWidget(choose);
+    selection->addWidget(remove);
+    selection->addStretch();
+    selection->addWidget(send_);
+    layout->addLayout(selection);
+    auto *connection = new QHBoxLayout;
+    connect_ = new QPushButton("连接 / 接收文件");
+    connect_->setObjectName("connect");
+    auto *scan = new QPushButton("扫码连接");
+    scan->setObjectName("scan");
+    scan_ = scan;
+    stop_ = new QPushButton("断开并停止全部任务");
+    stop_->setEnabled(false);
+    stop_->setObjectName("stop");
+    connection->addWidget(connect_);
+    connection->addWidget(scan);
+    connection->addStretch();
+    connection->addWidget(stop_);
+    layout->addLayout(connection);
     qr_ = new QLabel;
     qr_->setAlignment(Qt::AlignCenter);
-    qr_->setFixedSize(286, 286);
-    status_ = new QLabel(QStringLiteral("正在初始化安全传输…"));
-    status_->setObjectName(QStringLiteral("hint"));
-    status_->setAlignment(Qt::AlignCenter);
+    qr_->hide();
+    layout->addWidget(qr_);
+    status_ = new QLabel("尚未连接。设备需已关联，并能建立传输连接。");
+    status_->setObjectName("status");
     status_->setWordWrap(true);
-    progress_ = new QProgressBar;
-    progress_->setRange(0, 1000);
-    progress_->hide();
-    send_ = new QPushButton(QStringLiteral("发送文件"));
-    send_->setEnabled(false);
-    auto *buttons = new QHBoxLayout;
-    buttons->addStretch();
-    buttons->addWidget(send_);
-    buttons->addStretch();
-    layout->addWidget(title_);
-    layout->addWidget(qr_, 1, Qt::AlignHCenter);
+    status_->setTextFormat(Qt::PlainText);
     layout->addWidget(status_);
+    progress_ = new QProgressBar;
+    progress_->hide();
+    progress_->setRange(0, 1000);
     layout->addWidget(progress_);
-    layout->addLayout(buttons);
-    for (auto *widget :
-         QList<QWidget *>{title_, qr_, status_, progress_, send_})
-      widget->hide();
-    qrClose_ =
-        sourceButton(QStringLiteral("icon_tips_close"), QStringLiteral("关闭"));
-    qrClose_->setParent(this);
-    qrClose_->hide();
-    // The phone starts connecting as soon as the QR code is accepted.  Poll
-    // quickly enough that the official mobile-side handshake does not expire
-    // while the desktop is still waiting for its dispatch result.
+    tasks_ = new QTreeWidget;
+    tasks_->setObjectName("tasks");
+    tasks_->setColumnCount(3);
+    tasks_->setHeaderLabels({"方向 / 文件", "进度", "结果"});
+    tasks_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    tasks_->setMinimumHeight(150);
+    layout->addWidget(tasks_, 1);
+    downloads_ = qEnvironmentVariable(
+        "WETYPE_TRANSFER_DOWNLOAD_DIR",
+        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) +
+            "/WeTypeX");
+    auto *destination = new QHBoxLayout;
+    auto *directory = new QLabel("接收目录：" + downloads_);
+    directory->setTextFormat(Qt::PlainText);
+    directory->setWordWrap(true);
+    auto *open = new QPushButton("打开接收目录");
+    destination->addWidget(directory, 1);
+    destination->addWidget(open);
+    layout->addLayout(destination);
+    connect(open, &QPushButton::clicked, this, [this] {
+      if (QDir(downloads_).exists())
+        QDesktopServices::openUrl(QUrl::fromLocalFile(downloads_));
+      else
+        status_->setText("尚无接收目录，首次连接时会创建。");
+    });
+    connect(settings, &QPushButton::clicked, this, [] {
+      QProcess::startDetached(QStringLiteral(WETYPE_SETTINGS), {"--page", "5"});
+    });
+    connect(choose, &QPushButton::clicked, this, [this] {
+      addFiles(QFileDialog::getOpenFileNames(this, "选择要发送的文件"));
+    });
+    connect(remove, &QPushButton::clicked, this, [this] {
+      qDeleteAll(files_->selectedItems());
+      updateActions();
+    });
+    connect(peers_, qOverload<int>(&QComboBox::currentIndexChanged), this,
+            [this] { updateActions(); });
+    connect(refresh_, &QPushButton::clicked, this, [this] {
+      refresh_->setEnabled(false);
+      runAccount({"group-info"}, [this](const QJsonObject &result) {
+        refresh_->setEnabled(!active_);
+        if (!result.value("ok").toBool()) {
+          status_->setText("设备列表获取失败，请检查关联状态或网络后重试。");
+          return;
+        }
+        peers_->clear();
+        const auto self = wetype::jsonInteger(result.value("self_uin"));
+        for (const auto &value : result.value("devices").toArray()) {
+          const auto device = value.toObject();
+          const auto uin = wetype::jsonInteger(device.value("uin"));
+          if (uin <= 0 || uin == self)
+            continue;
+          peers_->addItem(device.value("name").toString("关联设备"),
+                          QString::number(uin));
+        }
+        if (!peers_->count()) {
+          peers_->addItem("尚无关联设备", QString());
+          status_->setText("请先在设置中关联设备，再刷新。");
+        } else
+          status_->setText("已读取关联设备；列表可见不代表对端在线。");
+        updateActions();
+      });
+    });
+    connect(connect_, &QPushButton::clicked, this,
+            [this] { begin(false, false); });
+    connect(scan, &QPushButton::clicked, this, [this] { begin(true, false); });
+    connect(send_, &QPushButton::clicked, this, [this] {
+      if (!active_)
+        begin(false, true);
+      else if (connected_)
+        queueSelection();
+    });
+    connect(stop_, &QPushButton::clicked, this, [this] {
+      if (QMessageBox::question(
+              this, "停止连接",
+              "停止当前连接及所有收发任务？未完成的文件不能视为完整文件。") ==
+          QMessageBox::Yes)
+        stopSession("已停止连接；未完成任务未确认成功。");
+    });
     poll_.setInterval(250);
     connect(&poll_, &QTimer::timeout, this, [this] { pollPeer(); });
+    activity_.setSingleShot(true);
+    connect(&activity_, &QTimer::timeout, this, [this] {
+      stopSession("传输长时间没有进展，已停止；请检查对端后重试。");
+    });
+    deadline_.setSingleShot(true);
+    connect(&deadline_, &QTimer::timeout, this,
+            [this] { stopSession("连接超时，请确认对端可用后重新连接。"); });
     connect(&session_, &QProcess::readyReadStandardOutput, this,
             [this] { readSessionEvents(); });
-    connect(&session_, &QProcess::errorOccurred, this, [this] {
-      status_->setText(QStringLiteral("安全传输核心启动失败"));
-    });
-    connect(send_, &QPushButton::clicked, this, [this] {
-      QMenu menu(this);
-      auto *files = menu.addAction(
-          QIcon(transferAsset(QStringLiteral("transfer-icons"),
-                              QStringLiteral("icon_filetype_general.svg"))),
-          QStringLiteral("发送文件"));
-      auto *directory = menu.addAction(
-          QIcon(transferAsset(QStringLiteral("transfer-icons"),
-                              QStringLiteral("icon_filetype_folder.svg"))),
-          QStringLiteral("发送文件夹"));
-      auto *chosen = menu.exec(send_->mapToGlobal(QPoint(0, send_->height())));
-      if (chosen == files) {
-        for (const auto &file :
-             QFileDialog::getOpenFileNames(this, QStringLiteral("发送文件")))
-          sendSession({{QStringLiteral("action"), QStringLiteral("upload")},
-                       {QStringLiteral("path"), file}});
-      } else if (chosen == directory) {
-        const auto path = QFileDialog::getExistingDirectory(
-            this, QStringLiteral("发送文件夹"));
-        if (!path.isEmpty())
-          sendSession(
-              {{QStringLiteral("action"), QStringLiteral("upload_directory")},
-               {QStringLiteral("path"), path}});
-      }
-    });
-    connect(close, &QToolButton::clicked, this, &QWidget::close);
-    connect(qrClose_, &QToolButton::clicked, this, &QWidget::close);
-    connect(settings, &QToolButton::clicked, this, [] {
-      QProcess::startDetached(QStringLiteral(WETYPE_SETTINGS),
-                              {QStringLiteral("--page"), QStringLiteral("5")});
-    });
-    connect(myDevices, &QPushButton::clicked, this, [this, myDevices] {
-      runAccount(
-          {QStringLiteral("group-info")},
-          [this, myDevices](const QJsonObject &result) {
-            QMenu menu(this);
-            const qint64 self =
-                wetype::jsonInteger(result.value(QStringLiteral("self_uin")));
-            for (const auto &value :
-                 result.value(QStringLiteral("devices")).toArray()) {
-              const auto device = value.toObject();
-              const qint64 uin =
-                  wetype::jsonInteger(device.value(QStringLiteral("uin")));
-              if (uin <= 0 || uin == self)
-                continue;
-              const int platform =
-                  device.value(QStringLiteral("platform")).toInt();
-              const QString icon =
-                  platform == 1
-                      ? QStringLiteral("icon_transmission_android_big.svg")
-                  : platform == 2
-                      ? QStringLiteral("icon_transmission_ios_big.svg")
-                      : QStringLiteral("icon_transmission_macos_big.svg");
-              auto *action = menu.addAction(
-                  QIcon(transferAsset(QStringLiteral("transfer-icons"), icon)),
-                  device.value(QStringLiteral("name")).toString());
-              action->setData(uin);
-            }
-            if (menu.actions().isEmpty()) {
-              QProcess::startDetached(
-                  QStringLiteral(WETYPE_SETTINGS),
-                  {QStringLiteral("--page"), QStringLiteral("5")});
-              return;
-            }
-            auto *chosen = menu.exec(myDevices->mapToGlobal(
-                QPoint(myDevices->width() - menu.sizeHint().width(),
-                       myDevices->height())));
-            if (!chosen)
-              return;
-            boundUin_ = QString::number(chosen->data().toLongLong());
-            showTransferPage(false);
-            startSession();
-          });
-    });
-    connect(others, &QPushButton::clicked, this, [this] {
-      showTransferPage(true);
-      startSession();
-    });
-    if (qEnvironmentVariableIsSet("WETYPE_TRANSFER_DIRECT"))
-      QTimer::singleShot(0, others, &QPushButton::click);
+    connect(&session_, &QProcess::errorOccurred, this,
+            [this](QProcess::ProcessError error) {
+              if (error == QProcess::FailedToStart)
+                stopSession("传输核心无法启动，请检查运行时安装。");
+            });
+    connect(&session_,
+            qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this](int, QProcess::ExitStatus) {
+              if (active_ && !restarting_)
+                stopSession("传输进程已退出；未完成任务未确认成功。");
+              updateActions();
+            });
+    auto *pick = new QShortcut(QKeySequence("Ctrl+O"), this);
+    connect(pick, &QShortcut::activated, choose, &QPushButton::click);
+    auto *submit = new QShortcut(QKeySequence("Ctrl+Return"), this);
+    connect(submit, &QShortcut::activated, send_, &QPushButton::click);
+    updateActions();
   }
 
   ~TransferWindow() override {
@@ -410,30 +400,215 @@ public:
   }
 
 private:
-  void showTransferPage(bool showQr) {
-    home_->hide();
-    resize(317, 519);
-    for (auto *widget :
-         QList<QWidget *>{title_, qr_, status_, progress_, send_})
-      widget->show();
-    progress_->hide();
-    send_->setEnabled(false);
-    qrClose_->move(width() - 36, 8);
-    qrClose_->raise();
-    qrClose_->show();
-    if (!showQr) {
-      title_->setText(QStringLiteral("隔空传送"));
-      const QPixmap connected(
-          transferAsset(QStringLiteral("transfer-images"),
-                        QStringLiteral("img_connection_pc_to_phone.png")));
-      if (!connected.isNull())
-        qr_->setPixmap(connected.scaled(240, 104, Qt::KeepAspectRatio,
-                                        Qt::SmoothTransformation));
-      status_->setText(QStringLiteral("正在邀请关联设备…"));
+  void updateActions() {
+    const bool idle = !active_ && session_.state() == QProcess::NotRunning;
+    const bool peer = !peers_->currentData().toString().isEmpty();
+    peers_->setEnabled(idle);
+    refresh_->setEnabled(idle && !accountBusy_);
+    connect_->setEnabled(idle && peer && !accountBusy_);
+    scan_->setEnabled(idle && !accountBusy_);
+    send_->setEnabled(files_->count() &&
+                      ((idle && peer && !accountBusy_) || connected_));
+    send_->setText(connected_ ? "发送所选文件" : "连接并发送");
+    stop_->setEnabled(active_);
+  }
+  void addFiles(const QStringList &paths) {
+    QSet<QString> known;
+    for (int i = 0; i < files_->count(); ++i)
+      known.insert(files_->item(i)->data(Qt::UserRole).toString());
+    for (const auto &path : paths) {
+      const QFileInfo info(path);
+      if (!info.isFile() || !info.isReadable() ||
+          known.contains(info.canonicalFilePath()) || files_->count() >= 100)
+        continue;
+      auto *item = new QListWidgetItem(info.fileName() + " · " +
+                                           QString::number(info.size()) + " B",
+                                       files_);
+      item->setData(Qt::UserRole, info.canonicalFilePath());
+      item->setToolTip(info.canonicalFilePath());
+      known.insert(info.canonicalFilePath());
     }
-    show();
+    updateActions();
+  }
+  void begin(bool qr, bool sendAfterConnect) {
+    if (active_ || session_.state() != QProcess::NotRunning || accountBusy_)
+      return;
+    boundUin_ = qr ? QString() : peers_->currentData().toString();
+    if (!qr && boundUin_.isEmpty())
+      return;
+    active_ = true;
+    connected_ = false;
+    ++generation_;
+    transferCode_.clear();
+    sessionOutput_.clear();
+    outgoing_.clear();
+    currentUpload_.clear();
+    if (sendAfterConnect)
+      captureSelection();
+    status_->setText("正在初始化连接…");
+    qr_->clear();
+    qr_->setVisible(qr);
+    deadline_.start(180000);
+    updateActions();
+    startSession();
+  }
+  void captureSelection() {
+    for (int i = 0; i < files_->count(); ++i) {
+      const auto path = files_->item(i)->data(Qt::UserRole).toString();
+      if (path != currentUpload_ && !outgoing_.contains(path))
+        outgoing_.enqueue(path);
+    }
+    files_->clear();
+  }
+  void queueSelection() {
+    captureSelection();
+    sendNext();
+    updateActions();
+  }
+  void sendNext() {
+    if (!active_ || !connected_ || !currentUpload_.isEmpty() ||
+        outgoing_.isEmpty())
+      return;
+    currentUpload_ = outgoing_.dequeue();
+    activity_.start(120000);
+    QFileInfo info(currentUpload_);
+    if (!info.isFile() || !info.isReadable()) {
+      recordTask(
+          {{"event", "read_error"}, {"path", currentUpload_}, {"status", 1}});
+      currentUpload_.clear();
+      QTimer::singleShot(0, this, [this] { sendNext(); });
+      return;
+    }
+    // Commands are serialized; only an actual backend completion releases the
+    // next file.
+    recordTask({{"event", "upload_start"}, {"path", currentUpload_}});
+    sendSession({{"action", "upload"}, {"path", currentUpload_}});
+  }
+  void stopSession(const QString &reason) {
+    active_ = false;
+    connected_ = false;
+    ++generation_;
+    poll_.stop();
+    deadline_.stop();
+    activity_.stop();
+    QStringList retry = outgoing_;
+    if (!currentUpload_.isEmpty())
+      retry.prepend(currentUpload_);
+    addFiles(retry);
+    outgoing_.clear();
+    currentUpload_.clear();
+    transferCode_.clear();
+    qr_->hide();
+    for (auto *row : taskRows_)
+      if (!row->data(0, Qt::UserRole).toBool()) {
+        row->setText(2, "已中断 / 未确认完成");
+        row->setData(0, Qt::UserRole, true);
+      }
+    if (session_.state() != QProcess::NotRunning) {
+      sendSession({{"action", "quit"}});
+      QTimer::singleShot(1000, &session_, [this] {
+        if (!active_ && session_.state() != QProcess::NotRunning)
+          session_.kill();
+      });
+    }
+    if (accountProcess_)
+      accountProcess_->kill();
+    progress_->hide();
+    status_->setText(reason);
+    updateActions();
+  }
+  void recordTask(const QJsonObject &event) {
+    const auto type = event.value("event").toString();
+    const auto path = event.value("path").toString();
+    if (path.isEmpty())
+      return;
+    const bool upload = type.startsWith("upload") || type == "read_error";
+    const auto key = QString(upload ? "send:" : "receive:") + path;
+    auto *row = taskRows_.value(key, nullptr);
+    if (!row ||
+        (row->data(0, Qt::UserRole).toBool() && type.endsWith("_start"))) {
+      if (tasks_->topLevelItemCount() >= 200) {
+        for (int i = 0; i < tasks_->topLevelItemCount(); ++i) {
+          auto *old = tasks_->topLevelItem(i);
+          if (!old->data(0, Qt::UserRole).toBool())
+            continue;
+          for (auto it = taskRows_.begin(); it != taskRows_.end();) {
+            if (it.value() == old)
+              it = taskRows_.erase(it);
+            else
+              ++it;
+          }
+          delete tasks_->takeTopLevelItem(i);
+          break;
+        }
+      }
+      if (tasks_->topLevelItemCount() >= 200) {
+        stopSession("活动任务过多，已停止连接；请分批传输。");
+        return;
+      }
+      row =
+          new QTreeWidgetItem(tasks_, {QString(upload ? "发送 · " : "接收 · ") +
+                                           QFileInfo(path).fileName(),
+                                       "", "处理中"});
+      taskRows_[key] = row;
+    }
+    if (row->data(0, Qt::UserRole).toBool())
+      return;
+    if (type.endsWith("_progress")) {
+      const auto total = wetype::jsonInteger(event.value("total"));
+      const auto done = wetype::jsonInteger(event.value("transferred"));
+      row->setText(
+          1, total > 0
+                 ? QString::number(qBound(
+                       0, int(100.0 * double(done) / double(total)), 100)) +
+                       "%"
+                 : "传输中");
+    } else if (type.endsWith("_done") || type == "read_error") {
+      const bool success =
+          event.value("status").toInt(-1) == 0 && type != "read_error";
+      const auto info = QFileInfo(path);
+      const auto expected = wetype::jsonInteger(event.value("total"), -1);
+      const auto root = QDir(downloads_).canonicalPath();
+      const bool saved = success && !upload && expected >= 0 &&
+                         !root.isEmpty() && info.isFile() &&
+                         info.size() == expected &&
+                         info.canonicalFilePath().startsWith(root + '/');
+      row->setText(2, !success ? "失败，可重新选择文件重试"
+                      : upload ? "发送端报告完成"
+                      : saved  ? "已落盘（大小已核对）"
+                               : "对端报告完成，落盘未核实");
+      if (saved)
+        row->setToolTip(2, info.canonicalFilePath());
+      row->setData(0, Qt::UserRole, true);
+    }
   }
 
+protected:
+  void closeEvent(QCloseEvent *event) override {
+    if (active_ &&
+        QMessageBox::question(this, "关闭传输",
+                              "关闭将断开连接并停止所有收发任务，继续？") !=
+            QMessageBox::Yes) {
+      event->ignore();
+      return;
+    }
+    stopSession("已关闭");
+    event->accept();
+  }
+  void dragEnterEvent(QDragEnterEvent *event) override {
+    if (event->mimeData()->hasUrls())
+      event->acceptProposedAction();
+  }
+  void dropEvent(QDropEvent *event) override {
+    QStringList paths;
+    for (const auto &url : event->mimeData()->urls())
+      if (url.isLocalFile())
+        paths << url.toLocalFile();
+    addFiles(paths);
+    event->acceptProposedAction();
+  }
+
+private:
   void startSession() {
     const QString root = dataRoot();
     const QString runtime = qEnvironmentVariable(
@@ -445,15 +620,19 @@ private:
         "WETYPE_TRANSFER_DOWNLOAD_DIR",
         QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) +
             QStringLiteral("/WeTypeX"));
-    QDir().mkpath(state + QStringLiteral("/parts"));
-    QDir().mkpath(downloads);
+    if (!QDir().mkpath(state + QStringLiteral("/parts")) ||
+        !QDir().mkpath(downloads)) {
+      stopSession("无法创建传输缓存或接收目录，请检查权限。");
+      return;
+    }
     wxpStarted_ = false;
     grpcAdvertised_ = false;
     lastDispatch_.clear();
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    environment.insert(QStringLiteral("WETYPE_SUPPORT_DIR"),
-                       qEnvironmentVariable("WETYPE_SUPPORT_DIR",
-                                            QStringLiteral(WETYPE_SUPPORT_DIR)));
+    environment.insert(
+        QStringLiteral("WETYPE_SUPPORT_DIR"),
+        qEnvironmentVariable("WETYPE_SUPPORT_DIR",
+                             QStringLiteral(WETYPE_SUPPORT_DIR)));
     environment.insert(QStringLiteral("WETYPE_FLURRY_DOWNLOAD_DIR"), downloads);
     environment.insert(QStringLiteral("WETYPE_FLURRY_TEMP_DIR"),
                        state + QStringLiteral("/parts"));
@@ -462,15 +641,15 @@ private:
         qEnvironmentVariable("WETYPE_TRANSFER_LOG",
                              QStringLiteral("/dev/null")),
         QIODevice::Append);
-    const QString wxp2p = QFileInfo(runtime).absolutePath() +
-                          QStringLiteral("/wxp2p");
-    preloadedWxp2p_ = QFileInfo::exists(wxp2p + QStringLiteral("/manifest.txt"));
+    const QString wxp2p =
+        QFileInfo(runtime).absolutePath() + QStringLiteral("/wxp2p");
+    preloadedWxp2p_ =
+        QFileInfo::exists(wxp2p + QStringLiteral("/manifest.txt"));
     if (preloadedWxp2p_) {
       environment.insert(QStringLiteral("WETYPE_AUX_RUNTIME"), wxp2p);
       environment.remove(QStringLiteral("WETYPE_WXP2P_DISPATCH_FILE"));
       session_.setProcessEnvironment(environment);
-      session_.start(host,
-                     {runtime, QStringLiteral("flurry-wxp2p-server")});
+      session_.start(host, {runtime, QStringLiteral("flurry-wxp2p-server")});
     } else {
       session_.start(host, {runtime, QStringLiteral("flurry-server")});
     }
@@ -513,6 +692,7 @@ private:
                    {QStringLiteral("remote_ca_file"), peerCaPath}});
       return;
     }
+    restarting_ = true;
     if (session_.state() != QProcess::NotRunning) {
       sendSession({{QStringLiteral("action"), QStringLiteral("quit")}});
       if (!session_.waitForFinished(1000)) {
@@ -536,20 +716,44 @@ private:
     status_->setText(QStringLiteral("正在通过安全直连或中继连接手机…"));
     wxpStarted_ = true;
     session_.start(host, {runtime, QStringLiteral("flurry-wxp2p-server")});
+    restarting_ = false;
   }
 
   void readSessionEvents() {
     sessionOutput_ += session_.readAllStandardOutput();
+    if (!active_) {
+      sessionOutput_.clear();
+      return;
+    }
+    if (sessionOutput_.size() > 4 * 1024 * 1024) {
+      stopSession("传输核心返回过大的消息，连接已停止。");
+      return;
+    }
     qsizetype newline = -1;
     while ((newline = sessionOutput_.indexOf('\n')) >= 0) {
+      if (!active_) {
+        sessionOutput_.clear();
+        break;
+      }
       const QByteArray line = sessionOutput_.left(newline);
       sessionOutput_.remove(0, newline + 1);
       const QJsonObject event = QJsonDocument::fromJson(line).object();
       const QString type = event.value(QStringLiteral("event")).toString();
+      recordTask(event);
+      if (!active_)
+        break;
+      if (type.endsWith("_progress") || type.endsWith("_start"))
+        activity_.start(120000);
+      if (type.endsWith("_done") || type == "read_error") {
+        bool pending = false;
+        for (auto *row : taskRows_)
+          pending |= !row->data(0, Qt::UserRole).toBool();
+        if (!pending)
+          activity_.stop();
+      }
       if (type == QStringLiteral("ready")) {
-        preloadedWxp2p_ =
-            event.value(QStringLiteral("transport")).toString() ==
-            QStringLiteral("wxp2p");
+        preloadedWxp2p_ = event.value(QStringLiteral("transport")).toString() ==
+                          QStringLiteral("wxp2p");
         requestCode(event);
       } else if (type == QStringLiteral("grpc_ready")) {
         advertiseGrpc(event);
@@ -557,74 +761,60 @@ private:
         status_->setText(QStringLiteral("已找到设备，正在建立安全连接…"));
       } else if (type == QStringLiteral("connected")) {
         poll_.stop();
-        const QPixmap connected(
-            transferAsset(QStringLiteral("transfer-images"),
-                          QStringLiteral("img_connection_pc_to_phone.png")));
-        if (!connected.isNull())
-          qr_->setPixmap(connected.scaled(240, 104, Qt::KeepAspectRatio,
-                                          Qt::SmoothTransformation));
-        title_->setText(QStringLiteral("隔空传送"));
-        status_->setText(QStringLiteral("已连接，可以收发文件"));
-        send_->setEnabled(true);
+        deadline_.stop();
+        connected_ = true;
+        qr_->hide();
+        status_->setText("已连接；对端发送的文件会自动保存到下方接收目录。");
+        updateActions();
+        sendNext();
       } else if (type == QStringLiteral("disconnected")) {
-        status_->setText(QStringLiteral("设备连接已断开"));
-        send_->setEnabled(false);
-        if (!transferCode_.isEmpty())
-          poll_.start();
+        stopSession("设备连接已断开，请重新连接。");
       } else if (type == QStringLiteral("connect_end")) {
         status_->setText(QStringLiteral("未能连接设备，正在等待手机重试…"));
-        send_->setEnabled(false);
+        connected_ = false;
+        updateActions();
         if (!transferCode_.isEmpty())
           poll_.start();
       } else if (type.endsWith(QStringLiteral("_progress"))) {
         const qint64 done =
             wetype::jsonInteger(event.value(QStringLiteral("transferred")));
-        const qint64 total = wetype::jsonInteger(event.value(QStringLiteral("total")));
+        const qint64 total =
+            wetype::jsonInteger(event.value(QStringLiteral("total")));
         progress_->show();
-        progress_->setValue(total > 0 ? int(done * 1000 / total) : 0);
+        progress_->setValue(
+            total > 0
+                ? qBound(0, int(1000.0 * double(done) / double(total)), 1000)
+                : 0);
         status_->setText(type.startsWith(QStringLiteral("upload"))
                              ? QStringLiteral("正在发送文件…")
                              : QStringLiteral("正在接收文件…"));
-      } else if (type.endsWith(QStringLiteral("_done"))) {
-        const int result = event.value(QStringLiteral("status")).toInt();
-        if (result == 0) {
-          progress_->setValue(1000);
-          status_->setText(type.startsWith(QStringLiteral("upload"))
-                               ? QStringLiteral("文件发送完成")
-                               : QStringLiteral("文件已保存到下载目录"));
-        } else {
-          progress_->hide();
-          const QString error = event.value(QStringLiteral("error")).toString();
-          status_->setText(type.startsWith(QStringLiteral("upload"))
-                               ? QStringLiteral("文件发送失败%1")
-                                     .arg(error.isEmpty()
-                                              ? QString()
-                                              : QStringLiteral("：") + error)
-                               : QStringLiteral("文件保存失败%1")
-                                     .arg(error.isEmpty()
-                                              ? QString()
-                                              : QStringLiteral("：") + error));
+      } else if (type.endsWith(QStringLiteral("_done")) ||
+                 type == "read_error") {
+        status_->setText("任务结果已更新，请查看下方列表。");
+        progress_->hide();
+        if ((type == "upload_done" || type == "read_error") &&
+            event.value("path").toString() == currentUpload_) {
+          currentUpload_.clear();
+          sendNext();
         }
       } else if (type == QStringLiteral("start_failed")) {
-        status_->setText(QStringLiteral("无法建立安全传输连接"));
+        stopSession(QStringLiteral("无法建立安全传输连接，请检查网络后重试。"));
       }
     }
   }
 
   void requestCode(const QJsonObject &identity) {
-    const bool wxp2p =
-        identity.value(QStringLiteral("transport")).toString() ==
-        QStringLiteral("wxp2p");
+    const bool wxp2p = identity.value(QStringLiteral("transport")).toString() ==
+                       QStringLiteral("wxp2p");
     if (wxp2p) {
       const QString path = dataRoot() + QStringLiteral("/state/p2p-info.json");
       QDir().mkpath(QFileInfo(path).absolutePath());
       QSaveFile file(path);
-      const QJsonObject info{
-          {QStringLiteral("ip"), localAddress()},
-          {QStringLiteral("ca_cert"),
-           identity.value(QStringLiteral("ca_cert"))},
-          {QStringLiteral("server_name"),
-           identity.value(QStringLiteral("server_name"))}};
+      const QJsonObject info{{QStringLiteral("ip"), localAddress()},
+                             {QStringLiteral("ca_cert"),
+                              identity.value(QStringLiteral("ca_cert"))},
+                             {QStringLiteral("server_name"),
+                              identity.value(QStringLiteral("server_name"))}};
       if (!file.open(QIODevice::WriteOnly) ||
           file.write(QJsonDocument(info).toJson(QJsonDocument::Compact)) < 0 ||
           !file.commit()) {
@@ -679,8 +869,8 @@ private:
       if (!result.value(QStringLiteral("ok")).toBool() ||
           transferCode_.isEmpty() ||
           (boundUin_.isEmpty() && !image.loadFromData(png, "PNG"))) {
-        status_->setText(
-            QStringLiteral("无法创建传输二维码，请检查配对和网络状态"));
+        stopSession(
+            QStringLiteral("无法创建传输邀请，请检查配对和网络状态后重试。"));
         return;
       }
       if (boundUin_.isEmpty())
@@ -694,12 +884,14 @@ private:
                     .arg(minutes)
               : QStringLiteral("已发送邀请；邀请将在 %1 分钟后失效")
                     .arg(minutes));
+      deadline_.start(
+          qBound(10000, result.value("expiration").toInt(180000), 300000));
       poll_.start();
     });
   }
 
   void pollPeer() {
-    if (accountBusy_ || transferCode_.isEmpty())
+    if (!active_ || accountBusy_ || transferCode_.isEmpty())
       return;
     runAccount(
         {QStringLiteral("p2p-peer"), transferCode_},
@@ -757,8 +949,7 @@ private:
     const QJsonObject info{
         {QStringLiteral("ip"), ip},
         {QStringLiteral("port"), port},
-        {QStringLiteral("ca_cert"),
-         identity.value(QStringLiteral("ca_cert"))},
+        {QStringLiteral("ca_cert"), identity.value(QStringLiteral("ca_cert"))},
         {QStringLiteral("server_name"),
          identity.value(QStringLiteral("server_name"))},
         {QStringLiteral("preferred_client"), false}};
@@ -772,19 +963,18 @@ private:
     }
     QFile::setPermissions(path,
                           QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    runAccount({QStringLiteral("p2p-update"), transferCode_, path},
-               [this](const QJsonObject &result) {
-                 if (!result.value(QStringLiteral("ok")).toBool()) {
-                   status_->setText(
-                       QStringLiteral("无法向手机发布安全传输端点"));
-                   grpcAdvertised_ = false;
-                   poll_.start();
-                   return;
-                 }
-                 status_->setText(
-                     QStringLiteral("已发布安全端点，正在连接手机…"));
-                 poll_.start();
-               });
+    runAccount(
+        {QStringLiteral("p2p-update"), transferCode_, path},
+        [this](const QJsonObject &result) {
+          if (!result.value(QStringLiteral("ok")).toBool()) {
+            status_->setText(QStringLiteral("无法向手机发布安全传输端点"));
+            grpcAdvertised_ = false;
+            poll_.start();
+            return;
+          }
+          status_->setText(QStringLiteral("已发布安全端点，正在连接手机…"));
+          poll_.start();
+        });
   }
 
   void runAccount(const QStringList &arguments,
@@ -793,16 +983,25 @@ private:
       return;
     accountBusy_ = true;
     auto *process = new QProcess(this);
+    accountProcess_ = process;
+    const auto generation = generation_;
+    auto *timeout = new QTimer(process);
+    timeout->setSingleShot(true);
+    connect(timeout, &QTimer::timeout, process, [process] { process->kill(); });
+    timeout->start(20000);
     wetype::onProcessDone(
         process, this,
-        [this, process, callback = std::move(callback)](int,
-                                                        QProcess::ExitStatus) {
+        [this, process, generation,
+         callback = std::move(callback)](int code, QProcess::ExitStatus) {
           accountBusy_ = false;
+          accountProcess_ = nullptr;
           const QJsonObject result =
               QJsonDocument::fromJson(process->readAllStandardOutput())
                   .object();
           process->deleteLater();
-          callback(result);
+          if (generation == generation_)
+            callback(code == 0 ? result : QJsonObject());
+          updateActions();
         });
     process->start(qEnvironmentVariable("WETYPE_ACCOUNT_TOOL",
                                         QStringLiteral(WETYPE_ACCOUNT_TOOL)),
@@ -816,9 +1015,20 @@ private:
     }
   }
 
+  QComboBox *peers_ = nullptr;
+  QListWidget *files_ = nullptr;
+  QTreeWidget *tasks_ = nullptr;
+  QMap<QString, QTreeWidgetItem *> taskRows_;
+  QPushButton *refresh_ = nullptr, *connect_ = nullptr, *scan_ = nullptr,
+              *stop_ = nullptr;
+  QProcess *accountProcess_ = nullptr;
+  QTimer deadline_, activity_;
+  QQueue<QString> outgoing_;
+  QString currentUpload_, downloads_;
+  quint64 generation_ = 0;
+  bool active_ = false, connected_ = false, restarting_ = false;
+  friend class TransferTests;
   QLabel *title_ = nullptr;
-  QWidget *home_ = nullptr;
-  QToolButton *qrClose_ = nullptr;
   QLabel *qr_ = nullptr;
   QLabel *status_ = nullptr;
   QProgressBar *progress_ = nullptr;
@@ -835,11 +1045,19 @@ private:
   bool grpcAdvertised_ = false;
 };
 
+#ifndef WETYPE_GUI_TEST
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
   app.setApplicationName(QStringLiteral("fcitx5-wetypex-transfer"));
   app.setDesktopFileName(QStringLiteral("fcitx5-wetypex-transfer"));
+  wetype::applyDesktopStyle(app);
+  wetype::SingleInstance instance;
+  if (!instance.acquire("transfer", app.arguments().contains("--activate")))
+    return 0;
   TransferWindow window;
+  instance.bind(window);
   window.show();
   return app.exec();
 }
+
+#endif

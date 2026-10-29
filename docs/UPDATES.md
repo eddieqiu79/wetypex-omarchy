@@ -1,67 +1,58 @@
 # Release and update channel
 
-## Decision and current readiness
+## Current distribution policy
 
-Use **immutable GitHub Releases from `eddieqiu79/wetypex-omarchy`**, containing reviewed Arch adapter packages. Stable is the default channel; `-rc.N` previews require an explicit opt-in. Installation remains a reviewed pacman operation. No separate update server, resident updater, root daemon, automatic upstream binary replacement, or automatic runtime download is required.
+Use **immutable GitHub Releases from `eddieqiu79/wetypex-omarchy`**, containing reviewed Arch adapter packages. The first native-desktop release is `0.1.0-rc.1`, a preview candidate. Stable remains separate and excludes candidates. Publishing a package does not establish a stable desktop/device acceptance result.
 
-This source revision supplies release-draft preparation, an explicit read-only checker, a settings-window check button, and an upstream review workflow. It does **not** establish an operational stable channel by itself. At the 2026-10-29 check, the public repository had no Releases. The release workflow has not yet produced an accepted release, and fresh-machine upgrade/rollback acceptance remains outstanding. Existing installations keep their old updater until they actually install a build containing this change.
+See [Release installation](RELEASE-INSTALL.md) for executable download/install/update commands. The installed settings GUI also checks and downloads verified packages. No root daemon, automatic runtime download, upstream binary replacement, clipboard service activation or Fcitx restart is performed by the update client. `pacman -Syu` alone does not discover this fork's releases: no pacman repository is registered.
 
-CI artifacts expire after 14 days; they remain build-review material. Release assets are the intended persistent distribution point. Enable GitHub immutable releases before the first publication: published assets and tags then cannot be replaced, and GitHub supplies a verifiable release attestation. See [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) and [verification](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/verify-release-integrity).
+Release assets are persistent distribution points; CI artifacts expire after 14 days and are for review. Immutable releases lock published tags/assets and provide GitHub release attestations. See [GitHub's immutability documentation](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) and [verification commands](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/verify-release-integrity).
 
 ## The two maintenance loops
 
-1. **Original upstream → maintained fork:** `upstream-watch.yml` checks the original WeTypeX head weekly and on demand against `docs/upstream-source-manifest.json`. It records both SHAs and a comparison link in the Actions summary and emits a warning on drift. It does not merge, open a PR, publish a release, or modify a desktop. A maintainer must review the report, merge suitable changes, preserve local fixes and licensing, update the provenance record, and run affected regressions/device tests. Scheduled Actions may be delayed or disabled on inactive repositories; maintainers must monitor them and can run the workflow manually.
-2. **Maintained fork → installed users:** users discover this fork's published stable/preview versions, verify exact release assets, then upgrade its Arch package. Original upstream binaries must never overwrite this fork. An update channel cannot guarantee ongoing maintenance if nobody reviews and releases upstream changes.
+1. **Original upstream → maintained fork:** `upstream-watch.yml` checks the original WeTypeX head weekly and on demand against `docs/upstream-source-manifest.json`. It records SHAs and comparison links in Actions, without automatically merging, opening a PR or publishing. A maintainer reviews changes, preserves local fixes/licensing, updates provenance and runs relevant checks. Scheduled Actions may be delayed/disabled on inactive repositories; monitor them and use manual dispatch when needed.
+2. **Maintained fork → installed users:** published stable/preview packages are discovered and verified, then installed through an explicit pacman transaction. Only this fork's releases are selected. Upstream binaries never overwrite this fork. Continued updates require maintainer review and release work; a channel is not a promise of indefinite maintenance.
 
-The proprietary runtime is a third independently pinned layer. A changed runtime requirement produces `runtime-review-required`, not an ordinary install recommendation. Device pairing, dictionary data and runtime acquisition are not part of an adapter update.
+The proprietary runtime is independently pinned. A changed runtime requirement produces `runtime-review-required`; the package client refuses it pending migration review. Device identities, dictionaries and runtime acquisition are outside adapter updates.
 
-## Maintainer publishing workflow
-
-1. Finish changes in a clean reviewed commit. Choose `VERSION` as `MAJOR.MINOR.PATCH-rc.N` for a preview or `MAJOR.MINOR.PATCH` for stable. `-dev` builds cannot become releases. Preserve Arch epoch 1. Every replacement build needs a new project version/tag; do not reuse an old release version even for a dependency rebuild.
-2. Add `docs/releases/vVERSION.md` with changes, known limitations, compatibility, upgrade/recovery expectations and test evidence. See [release records](releases/README.md). Create a matching reviewed tag whose commit is on this fork's main history. Do not move an existing tag.
-3. Run **Prepare reviewed release draft** with that tag. It verifies tag/VERSION/clean-checkout consistency and main ancestry, runs release policy tests, calls the existing clean Arch build/install/remove workflow on the exact SHA, validates package metadata and source checksum, and creates a **draft only**. Checkout and artifact actions are pinned. Build jobs have read-only repository permission; only the final draft-upload job has contents-write permission.
-4. Inspect the adapter package, source archive, recipe, dependency list, source manifest, `release-manifest.json`, SHA256SUMS and release notes. No official engine, identities, clipboard payloads or user test files belong in the assets. The bundle tool rejects unexpected top-level assets; source/privacy and license review is still required for the package contents.
-5. Exercise the exact candidate package on a target desktop: upgrade, input, affected synchronization/file directions, restart handling and rollback. Add evidence to the draft notes. Stable publication requires these checks; the workflow deliberately cannot certify a desktop from a container test.
-6. Confirm immutable releases are enabled and publish the draft manually. Previews stay marked prerelease. Verify the published release and package with GitHub CLI. A failed/incorrect release is superseded by a higher version, never silently replaced. Keep prior packages available for recovery.
-
-The workflow does not automatically publish, create tags, modify repository security settings or approve its own test claims. If draft generation fails, fix the candidate and inspect any existing draft before rerunning; uploads are not clobbered automatically.
-
-## User discovery
-
-In a build containing this revision, use the settings window's **Check stable updates** action or:
+## Discovery, download and installation
 
 ```sh
 fcitx5-wetypex-update --check
 fcitx5-wetypex-update --check --channel preview
+wetypex-omarchy-package check --channel preview
+wetypex-omarchy-package download --channel preview
 ```
 
-Checks are explicit network requests for release metadata only. They do not download/install packages, change files, pair devices, restart Fcitx, or read clipboard/identity data. No-argument calls from legacy addon configurations are silent no-ops. `--status` describes the local policy; legacy `--force` prints guidance and cannot restore upstream downloads. `WETYPE_UPDATE_API` / `WETYPE_UPDATE_DIR` cannot redirect this checker.
+Checks are explicit, read-only network requests. No-argument legacy updater calls remain silent no-ops; `--status` describes policy and `--force` cannot restore upstream downloads. Stable excludes prereleases; preview includes stable and candidates and selects the highest supported version. Network/rate-limit failure never means up to date. A newer installed version is not silently downgraded.
 
-Results distinguish `no-release`, `available`, `current`, `installed-newer`, `installed-version-unknown`, `runtime-review-required`, `unsupported-architecture`, `release-not-immutable` and `check-failed`. Failed or rate-limited requests never mean “up to date.” Stable excludes prereleases; preview includes stable and release candidates and chooses the highest supported version. It does not automatically downgrade a newer installation. Current means the checker/settings build version matches the release version; it does not certify that every resident process has restarted into it.
+An immutable API flag is **not** cryptographic verification: checker results explicitly report `cryptographically_verified: false`. The package client additionally runs `gh release verify` and `gh release verify-asset` for the downloaded manifest/package, checks their identity, runtime, SHA-256, size and `.PKGINFO`, then makes the completed download available. An invalid or unsupported verifier stops the operation. It does not use signed URLs in diagnostics.
 
-The checker validates repository, tag, channel, architecture, package metadata and runtime compatibility. An immutable API flag is **not** cryptographic verification: the output explicitly says `cryptographically_verified: false`. Verify downloaded bytes separately before installation.
+The helper needs Python 3.11+, Arch's `bsdtar`/pacman, and GitHub CLI supporting the release verification subcommands. Configure any GitHub CLI authentication directly, never through a shared token in chat. Verified assets may also be downloaded and inspected manually using GitHub CLI and `pacman -Qip`/`pacman -Qlp`; do not skip attestation verification.
 
-## Verified package upgrade
+Installation requires `install --confirm` and uses interactive `sudo pacman -U` on exactly one verified package. Dependency and conflict proposals remain visible. Current processes are not restarted. Private-prefix installations require migration review and must not be silently layered with the system package. See [the command guide](RELEASE-INSTALL.md) for separate first-install, update and recovery examples.
 
-Use a GitHub CLI version supporting `release verify` and `release verify-asset`. If unavailable, stop and arrange the supported tool version rather than skipping verification. These commands use GitHub's release attestation; checksums alone are not a separate authenticity mechanism.
+Downloads use private temporary directories, then move the complete verified pair to a new tag directory. Existing directories are retained, never overwritten. Normal failures clean up temporary files; forced process termination can leave an incomplete `.wetypex-download-*` directory. It is never treated as a verified download.
 
-1. Choose the exact tag reported by the checker. Read its notes and record the current package, runtime and activation state. Identify private-prefix installations separately; do not layer a system package over an unmanaged running deployment.
-2. Download the exact package and accompanying manifests into a new directory through that release's page or `gh release download TAG --repo eddieqiu79/wetypex-omarchy`. Replace `TAG` with a reviewed immutable tag; do not use shell input received from unvalidated release text.
-3. Run `gh release verify TAG --repo eddieqiu79/wetypex-omarchy`. Run `gh release verify-asset TAG FILE --repo eddieqiu79/wetypex-omarchy` for the package, `release-manifest.json`, and `SHA256SUMS`. Verify other assets too if using them. Require successful verification, then check the complete bundle with `sha256sum --check SHA256SUMS`.
-4. Inspect the exact package with `pacman -Qip` and `pacman -Qlp`. Check the expected package name, architecture, epoch/version, dependency compatibility and installation conflicts against the manifest and system. An authenticated package is not automatically compatible with a partially upgraded Arch system.
-5. Preserve the prior compatible package. Finish active composition/transfers; obtain the authorized installation/restart scope. Install the **single exact package path** using `sudo pacman -U /path/to/PACKAGE.pkg.tar.zst`. No unattended `--noconfirm` command is supplied for a user's desktop.
-6. Restart affected processes/services at the agreed time. Package replacement does not magically update running processes. Verify the installed build manifest, input and relevant device directions before removing retained recovery material.
+## Maintainer publishing workflow
 
-This is a stable distribution/discovery design with explicit installation, not an unattended auto-installer. There is no pacman repository registered yet, so `pacman -Syu` alone will not discover this package's releases. A signed pacman repository is a possible later step after versioning, upgrade and recovery have been exercised; it adds hosting and signing-key lifecycle responsibilities. An AUR package could deliver reviewed source builds later, but must track this fork rather than upstream binaries.
+1. Use a clean reviewed commit with `VERSION` set to `MAJOR.MINOR.PATCH-rc.N` or `MAJOR.MINOR.PATCH`. Development snapshots cannot become releases. Preserve Arch epoch 1. Every changed/rebuilt public package needs a new version/tag.
+2. Add `docs/releases/vVERSION.md` with scope, evidence, compatibility and limitations. Create the matching tag on this fork's main history; do not move existing tags.
+3. Run **Prepare reviewed release draft** with that tag. It checks tag/version/main ancestry, runs release-policy checks, invokes the clean Arch workflow for the exact SHA, validates bundle contents/metadata and creates a draft only.
+4. Inspect package/source contents, licensing/privacy, recipe, dependency list, manifests and checksums. No official engine, credentials or user test files belong in the assets. Clean Arch CI exercises install, upgrade from the recorded development baseline, rollback/re-upgrade, remove, and synthetic user-state preservation. These are package transactions within the same dependency environment, not desktop/runtime acceptance.
+5. Confirm immutable releases are enabled. A preview can be published with its outstanding validation explicitly stated. **Stable publication requires the exact candidate's real desktop/device, restart, upgrade and recovery acceptance**, recorded in release notes. The workflow does not certify these from container tests.
+6. Publish the reviewed draft with the correct prerelease flag and verify its release/asset attestations. Incorrect public assets are superseded by a higher version, never replaced. Keep prior packages for recovery.
+
+The draft workflow never publishes automatically. It has pinned checkout/artifact actions, read-only build permissions and contents-write only for draft upload. Upstream integration and final stable approval remain maintainer responsibilities.
 
 ## Recovery and first rollout
 
-Keep the previous package and its provenance/compatibility information. Rollback uses the retained exact package with pacman after checking dependency/state compatibility; it is not a rollback of the whole system. A downgrade cannot repair an incompatible state migration automatically. Updates must preserve identities, user dictionaries and settings. Any future migration needs versioned state, a scoped backup and a tested recovery plan before publication.
+Retain a previous working compatible package and manifest. The helper requires an exact old tag, `--allow-downgrade` and `--confirm` for downgrade; use a new destination directory. A retained pre-release development package can instead be installed by exact path through pacman after inspection. Downgrading the adapter is not a whole-system rollback and cannot fix incompatible runtime, dependency or user-state migrations.
 
-First rollout requires the reviewed channel changes on the default branch, enabling immutable releases in repository settings, preparing a candidate tag and notes, running the draft workflow, target upgrade/rollback/device acceptance, and manually publishing the first verified preview. Stable follows evidence, not a deadline. Existing users need one explicit upgrade to a build containing the new checker; it cannot bootstrap itself into installations that never had it.
+This candidate introduces no user-state schema migration. Package updates preserve identities, runtime, dictionaries and preferences. Future migrations need explicit versioning, scoped backup and recovery testing. Existing unmanaged installations need one reviewed migration; existing installed packages need an explicit upgrade to obtain the new checker/client. Processes already running remain on old code until an authorized restart.
 
-## Validation of this implementation draft
+## Validation boundaries
 
-Locally, updater inert-mode tests and release-channel tests cover no-release results, stable/preview filtering, version ordering, immutable/source-identity checks, runtime mismatch, sanitized network failure, tag restrictions and release-bundle allowlisting/checksums. Arch `vercmp` confirms development < release candidate < stable for the new version mapping. A live read-only query returned `no-release`; the upstream watcher detected source drift and did not merge it.
+Offline tests cover channel/version ordering, immutable manifest identity, runtime mismatch, safe redirects, sanitized network failure, release bundle provenance, attestation command ordering, tampered package rejection, partial-download cleanup, no implicit installation, and retained download directories. GUI tests use isolated state and synthetic backend events. Exact CI and release verification results belong to the tagged SHA, not an unqualified future branch head.
 
-The complete adapter also built locally using the previously verified dependency sysroot and system libcurl; all three CTest suites passed. This is an isolated source build, not a clean Arch package or live upgrade test. Workflow syntax parsing and local tests are not a completed GitHub release run. Release attestations, published-asset verification, real upgrades/downgrades, and the new settings button in a live installed build remain separate validation steps. Check GitHub Actions for package results tied to the exact published commit.
+Fresh-machine activation, real GUI input and all affected official-device directions, long-duration behavior, sleep/network recovery and an installed-desktop rollback remain separate acceptance layers. See [native desktop behavior](DESKTOP.md) and the specific [release record](releases/v0.1.0-rc.1.md).

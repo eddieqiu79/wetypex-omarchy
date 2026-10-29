@@ -3,8 +3,8 @@
 
 #include <QAbstractButton>
 #include <QBoxLayout>
-#include <QFrame>
 #include <QFile>
+#include <QFrame>
 #include <QIcon>
 #include <QKeyEvent>
 #include <QLabel>
@@ -23,8 +23,8 @@
 
 namespace original_ui {
 
-constexpr auto kGreen = "#23c891";
-constexpr auto kContent = "#f7f7f7";
+constexpr auto kGreen = "#24C891";
+constexpr auto kContent = "#282827";
 constexpr auto kMuted = "#969696";
 
 inline QString asset(const QString &name) {
@@ -38,9 +38,9 @@ inline QString imageAsset(const QString &name) {
 inline QIcon appIcon() {
   auto icon = QIcon::fromTheme("fcitx5-wetypex");
   if (icon.isNull())
-    icon = QIcon(
-        QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                               "icons/hicolor/256x256/apps/fcitx5-wetypex.png"));
+    icon = QIcon(QStandardPaths::locate(
+        QStandardPaths::GenericDataLocation,
+        "icons/hicolor/256x256/apps/fcitx5-wetypex.png"));
   return icon;
 }
 
@@ -56,7 +56,7 @@ inline QPixmap tinted(const QString &name, const QColor &color, int size = 20) {
 
 inline QIcon navIcon(const QString &name) {
   QIcon icon;
-  icon.addPixmap(tinted(name, QColor("#263b40")), QIcon::Normal, QIcon::Off);
+  icon.addPixmap(tinted(name, QColor("#c8d8d0")), QIcon::Normal, QIcon::Off);
   icon.addPixmap(tinted(name, Qt::white), QIcon::Selected, QIcon::Off);
   return icon;
 }
@@ -66,6 +66,7 @@ public:
   explicit Toggle(bool checked = false, QWidget *parent = nullptr)
       : QAbstractButton(parent) {
     setCheckable(true);
+    setFocusPolicy(Qt::StrongFocus);
     setChecked(checked);
     setCursor(Qt::PointingHandCursor);
     setFixedSize(36, 20);
@@ -76,7 +77,7 @@ protected:
   void paintEvent(QPaintEvent *) override {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    QColor track = isChecked() ? QColor(kGreen) : QColor("#c6c7c8");
+    QColor track = isChecked() ? QColor(kGreen) : QColor("#666662");
     painter.setPen(Qt::NoPen);
     painter.setBrush(track);
     painter.drawRoundedRect(rect(), 10, 10);
@@ -90,6 +91,7 @@ public:
   explicit Check(bool checked = false, QWidget *parent = nullptr)
       : QAbstractButton(parent) {
     setCheckable(true);
+    setFocusPolicy(Qt::StrongFocus);
     setChecked(checked);
     setCursor(Qt::PointingHandCursor);
     setFixedSize(18, 18);
@@ -101,7 +103,7 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(QPen(isChecked() ? QColor(kGreen) : QColor("#cfd1d2"), 1));
-    painter.setBrush(isChecked() ? QColor(kGreen) : Qt::white);
+    painter.setBrush(isChecked() ? QColor(kGreen) : QColor("#353533"));
     painter.drawRoundedRect(QRectF(0.5, 0.5, 17, 17), 3, 3);
     if (isChecked()) {
       QPen check(Qt::white, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
@@ -153,22 +155,31 @@ public:
 protected:
   void paintEvent(QPaintEvent *) override {
     QPainter painter(this);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    const bool empty = icon_->pixmap().isNull();
+#else
+    const bool empty = !icon_->pixmap() || icon_->pixmap()->isNull();
+#endif
+    if (empty) {
+      painter.setPen(QPen(QColor("#d8d8d2"), 2));
+      painter.drawLine(18, 9, 28, 19);
+      painter.drawLine(28, 9, 18, 19);
+    }
     if (underMouse())
       painter.fillRect(rect(), QColor(0, 0, 0, 12));
   }
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-  void enterEvent(QEnterEvent *event) override {
+  void enterEvent(QEnterEvent *event) override{
 #else
   void enterEvent(QEvent *event) override {
 #endif
-    QAbstractButton::enterEvent(event);
-    update();
-  }
-  void leaveEvent(QEvent *event) override {
-    QAbstractButton::leaveEvent(event);
-    update();
-  }
-};
+      QAbstractButton::enterEvent(event);
+  update();
+} void leaveEvent(QEvent *event) override {
+  QAbstractButton::leaveEvent(event);
+  update();
+}
+}; // namespace original_ui
 
 class VoiceSample final : public QWidget {
 public:
@@ -181,8 +192,7 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const int center = width() / 2;
-    painter.setPen(QPen(QColor("#dedede"), 1.4, Qt::SolidLine,
-                        Qt::RoundCap));
+    painter.setPen(QPen(QColor("#dedede"), 1.4, Qt::SolidLine, Qt::RoundCap));
     const int heights[] = {7, 16, 24, 12, 20, 28, 16, 10, 20, 13, 6};
     for (int i = 0; i < 11; ++i) {
       const int x = center - 91 + i * 6;
@@ -202,39 +212,12 @@ protected:
 };
 
 class Window final : public QWidget {
-  QPoint dragOffset_;
-
 public:
   explicit Window(QWidget *parent = nullptr) : QWidget(parent) {
-    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
-    setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(715, 569);
+    setWindowFlags(Qt::Window);
+    setMinimumSize(740, 540);
+    resize(960, 720);
   }
-
-protected:
-  void mousePressEvent(QMouseEvent *event) override {
-    if (event->button() != Qt::LeftButton ||
-        wetype::mousePosition(event).y() >= 58)
-      return;
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-    if (windowHandle() && windowHandle()->startSystemMove()) {
-      event->accept();
-      return;
-    }
-#endif
-
-    dragOffset_ =
-        wetype::mouseGlobalPosition(event) - frameGeometry().topLeft();
-    event->accept();
-  }
-  void mouseMoveEvent(QMouseEvent *event) override {
-    if (event->buttons().testFlag(Qt::LeftButton) && !dragOffset_.isNull()) {
-      move(wetype::mouseGlobalPosition(event) - dragOffset_);
-      event->accept();
-    }
-  }
-  void mouseReleaseEvent(QMouseEvent *) override { dragOffset_ = {}; }
 };
 
 inline QFrame *card(QWidget *parent = nullptr) {
@@ -255,7 +238,7 @@ inline QWidget *row(const QString &title, const QString &subtitle = {},
                     QWidget *trailing = nullptr, int height = 62) {
   auto *widget = new QWidget;
   widget->setObjectName("settingRow");
-  widget->setFixedHeight(height);
+  widget->setMinimumHeight(height);
   auto *layout = new QHBoxLayout(widget);
   layout->setContentsMargins(15, 0, 15, 0);
   auto *text = new QVBoxLayout;
@@ -263,6 +246,7 @@ inline QWidget *row(const QString &title, const QString &subtitle = {},
   text->addStretch();
   auto *titleLabel = new QLabel(title);
   titleLabel->setObjectName("rowTitle");
+  titleLabel->setWordWrap(true);
   text->addWidget(titleLabel);
   if (!subtitle.isEmpty()) {
     auto *subtitleLabel = new QLabel(subtitle);
@@ -292,7 +276,7 @@ inline Page page(const QString &title, bool scroll = true) {
   auto *heading = new QLabel(title);
   heading->setObjectName("pageHeading");
   heading->setContentsMargins(12, 0, 0, 0);
-  heading->setFixedHeight(20);
+  heading->setMinimumHeight(30);
   layout->addWidget(heading);
   auto *viewport = new QWidget;
   auto *body = new QVBoxLayout(viewport);
@@ -304,8 +288,7 @@ inline Page page(const QString &title, bool scroll = true) {
   area->setFrameShape(QFrame::NoFrame);
   area->setWidgetResizable(true);
   area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  area->setVerticalScrollBarPolicy(scroll ? Qt::ScrollBarAsNeeded
-                                          : Qt::ScrollBarAlwaysOff);
+  area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   area->setWidget(viewport);
   layout->addWidget(area, 1);
   return {widget, body, area};

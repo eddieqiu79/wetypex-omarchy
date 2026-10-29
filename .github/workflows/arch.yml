@@ -34,10 +34,22 @@ jobs:
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE"
           runuser -u builder -- python3 tools/build-arch.py --output /tmp/wetypex-build --build
+      - name: Build retained baseline for package upgrade and rollback
+        run: |
+          runuser -u builder -- git worktree add --detach /tmp/wetypex-baseline-source 61686a00fceec3cb650e4a098af42b67d77880d9
+          runuser -u builder -- python3 /tmp/wetypex-baseline-source/tools/build-arch.py --output /tmp/wetypex-baseline-build --build
+          pacman -U --noconfirm /tmp/wetypex-baseline-build/wetypex-omarchy-*.pkg.tar.zst
+          install -d -m 700 /home/builder/.config/fcitx5 /home/builder/.local/share/fcitx5-wetypex/state
+          printf '%s\n' '{"synthetic_keep":true}' > /home/builder/.config/fcitx5/wetypex.json
+          printf '%s\n' 'synthetic preservation marker; not an identity' > /home/builder/.local/share/fcitx5-wetypex/state/package-test-marker
+          sha256sum /home/builder/.config/fcitx5/wetypex.json /home/builder/.local/share/fcitx5-wetypex/state/package-test-marker > /tmp/user-state.sha256
       - name: Verify package and isolated installation
         run: |
           pacman -U --noconfirm /tmp/wetypex-build/wetypex-omarchy-*.pkg.tar.zst
           pacman -Qkk wetypex-omarchy
+          sha256sum --check /tmp/user-state.sha256
+          /usr/bin/fcitx5-wetypex-update --status
+          test -x /usr/bin/wetypex-omarchy-package
           test -f /usr/share/fcitx5-wetypex/compat/cloud/图片格式.py
           test -f /usr/share/licenses/fcitx5-wetypex/WeTypeX-MIT.txt
           test -f /usr/share/fcitx5-wetypex/compat/LICENSE
@@ -50,7 +62,15 @@ jobs:
           # GitHub artifact filenames cannot contain colons; package metadata is unchanged.
           for pkg in *.pkg.tar.zst; do safe=$(printf "%s" "$pkg" | tr : _); if [ "$pkg" != "$safe" ]; then mv -- "$pkg" "$safe"; fi; done
           sha256sum *.pkg.tar.zst > SHA256SUMS
+          # Exercise package-level rollback and re-upgrade using the same dependency set.
+          pacman -U --noconfirm /tmp/wetypex-baseline-build/wetypex-omarchy-*.pkg.tar.zst
+          pacman -Qkk wetypex-omarchy
+          sha256sum --check /tmp/user-state.sha256
+          pacman -U --noconfirm /tmp/wetypex-build/wetypex-omarchy-*.pkg.tar.zst
+          pacman -Qkk wetypex-omarchy
+          sha256sum --check /tmp/user-state.sha256
           pacman -R --noconfirm wetypex-omarchy
+          sha256sum --check /tmp/user-state.sha256
           test ! -e /usr/bin/wetypex-image-helper
           test ! -e /usr/lib/systemd/user/wetypex-sync.service
       - name: Upload source manifest and package for review (not a release)

@@ -2,6 +2,8 @@
 
 This fork has its own package recipe and source exporter in `packaging/arch/` and `tools/build-arch.py`. It does not fetch upstream WeTypeX release binaries. The old `packaging/aur/` recipe remains an upstream reference and is not this fork's installation entry point.
 
+For persistent release packages and verified updates, start with [Release installation](RELEASE-INSTALL.md). The commands below also document source builds and explicit desktop activation.
+
 ## Scope and status
 
 Target: Omarchy/Arch Linux x86_64. Build uses system libcurl and Qt6, and disables the optional layer-shell toolbar. A pinned libkqueue source is fetched by CMake. Arch package versions remain rolling; this is not a completely frozen dependency lockfile. CI records the installed package list.
@@ -75,9 +77,9 @@ The explicit activation creates one Fcitx drop-in to suppress its own sync launc
 
 ## 5. Updates, deactivation, removal and recovery
 
-See [Updates and upstream integration](UPDATES.md) for the current manual update policy, the distinction between original WeTypeX source updates and this fork's packages, and requirements for a future release channel. The inherited upstream binary downloader is disabled in the revised source; installed older builds are unaffected until replaced. There is no configured pacman repository or automatic update channel for this fork.
+See [Updates and upstream integration](UPDATES.md) for the current manual update policy, the distinction between original WeTypeX source updates and this fork's packages, and the verified release channel. The inherited upstream binary downloader is disabled in the revised source; installed older builds are unaffected until replaced. Verified updates are available through `wetypex-omarchy-package`; there is no configured pacman repository or unattended upgrade service.
 
-Updates use a newly built, inspected package via `pacman -U`. Retain the previous package for rollback; restart the affected user services only when authorized and after checking for active transfers/input. Runtime updates and account migration are separate operations and are not automatic.
+Updates use a verified published package or a newly built, inspected package via `pacman -U`. Retain the previous package for rollback; restart the affected user services only when authorized and after checking for active transfers/input. Runtime updates and account migration are separate operations and are not automatic.
 
 Before removing the package, undo this tool's activation as the desktop user:
 

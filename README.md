@@ -1,6 +1,6 @@
 # WeTypeX Omarchy
 
-**Project version: 0.1.0-dev — development preview.** This is separate from the supported official runtime version, `2.2.3.657`. See [versioning](docs/VERSIONING.md).
+**Project version: 0.1.0-rc.1 — release candidate, not yet stable.** This is separate from the supported official runtime version, `2.2.3.657`. See [versioning](docs/VERSIONING.md).
 
 A community-maintained adaptation of [WeTypeX](https://github.com/panxuc/fcitx5-wetypex) for Omarchy and Hyprland, focused on Chinese input and reliable interoperability with the official WeType clients on macOS and iOS.
 
@@ -79,7 +79,11 @@ The Mac ↔ iPhone file copy-and-paste behavior observed during testing used App
 - Service templates are included, but building or staging the project does not automatically enable services or replace an existing input method.
 - Cross-device clipboard tools should be coordinated to avoid competing writes and ambiguous synchronization results.
 
-## Installation Status
+## Install and update
+
+Use [verified GitHub Release installation](docs/RELEASE-INSTALL.md) for persistent Arch packages and subsequent updates. The preview channel is explicit; stable will remain empty until candidate desktop/device acceptance is complete. The package includes the real native settings and transfer GUI. It does not contain or automatically acquire the official runtime.
+
+## Source package installation
 
 Use [Arch / Omarchy installation](docs/ARCH.md) for this fork's `PKGBUILD` exporter, package build and explicit user-service setup. The old upstream AUR recipe is not this fork's installer. Start with the read-only `python3 tools/preflight.py`. The package does not obtain official runtime, pair devices, or silently change the desktop. Clean desktop/device validation remains necessary; CI packaging alone is not end-to-end acceptance.
 
@@ -122,18 +126,19 @@ Long-duration operation, sleep and wake recovery, network interruptions, transfe
 
 ## Documentation
 
-### Desktop prototype preview
+### Native desktop applications
 
-The new GUI is currently a standalone interaction demo, not the installed settings/transfer application. It uses synthetic devices and memory-only settings; it does not send files. Build/run instructions are in [the demo guide](docs/DESKTOP-DEMO.md). The production settings application separately gains an explicit fork-update check.
+The packaged settings and transfer windows now use the existing real backends with a dark, resizable desktop interface. See [native GUI operation and limits](docs/DESKTOP.md). The original [isolated demo](docs/DESKTOP-DEMO.md) remains available for design experiments and is not installed as the real application.
 
-![Isolated file-transfer demo with synthetic devices](docs/images/desktop-demo-transfer.png)
+![Native file-transfer application, synthetic test task](docs/images/native-transfer.png)
 
-![Isolated input-settings demo with synthetic preferences](docs/images/desktop-demo-settings.png)
+![Native settings application, empty isolated preferences](docs/images/native-settings.png)
 
-- [Changelog](CHANGELOG.md): distinguish the isolated GUI prototype from changes to the installed adapter.
-- [Isolated desktop interaction demo](docs/DESKTOP-DEMO.md): a resizable Qt prototype for settings and file-transfer workflows, with simulated tasks and no connection to the live input method.
+- [Verified installation and updates](docs/RELEASE-INSTALL.md): persistent, immutable release assets with explicit pacman installation.
+- [Changelog](CHANGELOG.md).
+- [Native desktop GUI](docs/DESKTOP.md): real workflows, receive consent, task results and recovery.
 - [Settings content inventory](docs/SETTINGS-CONTENT.md): configurable options, source mappings, and the distinction between UI controls, backend support and runtime validation.
-- [Updates and upstream integration](docs/UPDATES.md): the manual fork-package update route and the requirements for a future release channel.
+- [Updates and upstream integration](docs/UPDATES.md): release verification, stable/preview channels and upstream review policy.
 
 The detailed engineering records below are currently in Chinese:
 

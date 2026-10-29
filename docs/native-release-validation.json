@@ -1,0 +1,26 @@
+{
+  "version": "0.1.0-rc.1",
+  "date": "2026-10-29",
+  "parent_commit": "61686a00fceec3cb650e4a098af42b67d77880d9",
+  "local": {
+    "architecture": "x86_64",
+    "qt": "6.11.2",
+    "cmake": "4.4.3",
+    "full_adapter_build": "passed",
+    "ctest_suites": 9,
+    "test_result": "passed",
+    "gui_test_data": "isolated settings and synthetic transfer events only",
+    "native_settings_mapping": "observed in Hyprland; no live input method replacement",
+    "production_config_modified": false
+  },
+  "release_checks": {
+    "package_verification_tests": "passed",
+    "clean_arch_lifecycle": "see Actions for exact tagged commit",
+    "release_attestation": "must be verified after publication"
+  },
+  "acceptance_pending": [
+    "Exact candidate GUI official-device transfer matrix",
+    "Exact candidate desktop input/settings and package migration",
+    "Restart, sleep/network recovery and long-duration use"
+  ]
+}

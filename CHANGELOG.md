@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-rc.1
+
+- Installable native dark settings and transfer windows connected to the existing backend.
+- Async phrase/microphone operations, malformed-config protection and acknowledged sync-state rollback.
+- Explicit file queue, per-file backend results, receive-directory verification, session stop/deadlines and single-instance activation.
+- Verified immutable-release package client for download/install/update/recovery, with explicit preview selection.
+- Actual GUI tests and clean Arch package upgrade/downgrade/user-state-preservation checks.
+- Candidate release; fresh desktop/device acceptance remains required. See [release notes](docs/releases/v0.1.0-rc.1.md).
+
+
 ## 0.1.0-dev — development work
 
 ### Desktop interaction prototype

@@ -645,7 +645,7 @@ class WeType : public InputMethodEngine {
     loadKeys(shortcuts->secondCandidateKeys, "second_candidate_keys");
     loadKeys(shortcuts->thirdCandidateKeys, "third_candidate_keys");
     config_.update.mutableValue()->autoUpdate.setValue(
-        boolSetting("auto_update", true));
+        boolSetting("auto_update", false));
   }
   void saveNativeConfig() {
     const char *configHome = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");

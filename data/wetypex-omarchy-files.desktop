@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=WeTypeX File Transfer
+Name[zh_CN]=WeTypeX 文件传输
+Comment=Explicit file transfers with associated WeType devices
+Comment[zh_CN]=与关联的微信输入法设备收发文件
+Exec=wetypex-files
+Icon=folder-remote
+Categories=Network;FileTransfer;
+StartupNotify=true

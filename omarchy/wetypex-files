@@ -5,7 +5,7 @@ from pathlib import Path
 prefix=Path(__file__).resolve().parents[1]
 unit='wetypex-transfer.service'
 if subprocess.run(['systemctl','--user','is-active','--quiet',unit]).returncode==0:
-    print('WeTypeX 文件传输窗口已经打开。')
+    subprocess.run([str(prefix/'bin/fcitx5-wetypex-transfer'), '--activate'], check=False)
     raise SystemExit(0)
 command=['systemd-run','--user','--quiet','--collect','--unit='+unit,
  '--property=PartOf=graphical-session.target','--property=After=graphical-session.target',
