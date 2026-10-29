@@ -1,0 +1,47 @@
+[
+  {
+    "file": "synthetic.avif",
+    "bytes": 705,
+    "sha256": "6a757a5f38a086767ab474b529c62f52c66892913cb67ffca8da10c3d1a763c9"
+  },
+  {
+    "file": "synthetic.bmp",
+    "bytes": 4746,
+    "sha256": "e8293538f1ba421ed632ebce4fbd4e4ccb458feb97078a3b08101e1ec33db440"
+  },
+  {
+    "file": "synthetic.gif",
+    "bytes": 992,
+    "sha256": "7395fc1d73fc7f9d987e611d8b5c00f6fef78842d831d8df0fe723fe4fc7bb35"
+  },
+  {
+    "file": "synthetic.heic",
+    "bytes": 920,
+    "sha256": "89c844402a9134ce3d1b47a3718a4fe1768060ab82dc9dee2ecf553715b114f2"
+  },
+  {
+    "file": "synthetic.heif",
+    "bytes": 920,
+    "sha256": "89c844402a9134ce3d1b47a3718a4fe1768060ab82dc9dee2ecf553715b114f2"
+  },
+  {
+    "file": "synthetic.jpg",
+    "bytes": 2011,
+    "sha256": "40efb07b4ce3ae02857048e0185c1f152cddaf1c1699fe9ac73d13ba7accc52e"
+  },
+  {
+    "file": "synthetic.png",
+    "bytes": 535,
+    "sha256": "da2e459ac61c446b205a665bf22609f4ee81cf67d40d548fb8681905f104bb71"
+  },
+  {
+    "file": "synthetic.tiff",
+    "bytes": 4872,
+    "sha256": "2d4bdc3d687574b5d814a6feb68a050248870f77cbfe9ba8dbfcffb15cedb251"
+  },
+  {
+    "file": "synthetic.webp",
+    "bytes": 516,
+    "sha256": "83bc1be0474f490e380cdd0f45fed124c4c48ab757b0cfc8cef5e737970ea65b"
+  }
+]

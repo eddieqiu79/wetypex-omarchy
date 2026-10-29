@@ -1,0 +1,22 @@
+[
+  {
+    "file": "libc++abi-22.1.8-1-x86_64.pkg.tar.zst",
+    "sha256": "5603e42dd38a5deeed47d8077b86f49b25097b40f915b294c41f9239df65f8d3",
+    "signature_verified": true
+  },
+  {
+    "file": "libc++-22.1.8-1-x86_64.pkg.tar.zst",
+    "sha256": "e32a870f8dc6035b2fd472088f7b356b5889eb29a26bedd4ec472df07853c549",
+    "signature_verified": true
+  },
+  {
+    "file": "libime-1.1.16-1-x86_64.pkg.tar.zst",
+    "sha256": "adacfc6243df2544665a1d4cc8f2bf2ee6d4966fc2c5f2a37a3ff579134b6c67",
+    "signature_verified": true
+  },
+  {
+    "file": "boost-1.92.0-1-x86_64.pkg.tar.zst",
+    "sha256": "0d795c6401c8bfa16012ada7e2e7f34934fb268f9174470edac1b389056f79bb",
+    "signature_verified": true
+  }
+]

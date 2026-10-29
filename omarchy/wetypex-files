@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+import os,subprocess
+from pathlib import Path
+prefix=Path(__file__).resolve().parents[1]
+unit='wetypex-transfer.service'
+if subprocess.run(['systemctl','--user','is-active','--quiet',unit]).returncode==0:
+    print('WeTypeX 文件传输窗口已经打开。')
+    raise SystemExit(0)
+command=['systemd-run','--user','--quiet','--collect','--unit='+unit,
+ '--property=PartOf=graphical-session.target','--property=After=graphical-session.target',
+ '--property=UMask=0077','--property=StandardOutput=null','--property=StandardError=null',
+ '--setenv=QT_QPA_PLATFORM=wayland','--setenv=QT_QPA_PLATFORMTHEME=',
+ '--setenv=QT_STYLE_OVERRIDE=Fusion']
+for key in ('WAYLAND_DISPLAY','DISPLAY','XDG_RUNTIME_DIR','DBUS_SESSION_BUS_ADDRESS'):
+ if key in os.environ:command+=['--setenv='+key+'='+os.environ[key]]
+subprocess.run(command+[str(prefix/'bin/fcitx5-wetypex-transfer')],check=True)

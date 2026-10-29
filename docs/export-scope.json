@@ -1,0 +1,27 @@
+{
+  "upstream_commit": "291193a26938e0e8858d72b737066f37eb7a5f94",
+  "changed_upstream_files": [
+    ".gitignore",
+    "CMakeLists.txt",
+    "README.md",
+    "scripts/fcitx5-wetypex-account.sh.in",
+    "scripts/fcitx5-wetypex-syncd.sh.in",
+    "src/backend/business_services.hpp",
+    "src/clipboard/main.cpp",
+    "src/transfer/main.cpp"
+  ],
+  "excluded_upstream_files": [
+    ".github/workflows/build.yml",
+    ".github/workflows/release.yml"
+  ],
+  "new_source_components": [
+    "omarchy",
+    "compat",
+    "tests",
+    "fixtures",
+    "cmake/OmarchyCompatibility.cmake"
+  ],
+  "official_runtime_included": false,
+  "private_identity_included": false,
+  "private_test_payloads_included": false
+}

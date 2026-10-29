@@ -1,0 +1,23 @@
+[Unit]
+Description=WeTypeX text and image clipboard synchronization
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+UMask=0077
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=15
+KillMode=control-group
+NoNewPrivileges=yes
+Environment="WETYPE_CLIPBOARD_HELPER=@CMAKE_INSTALL_FULL_BINDIR@/wetypex-image-helper"
+Environment="WETYPE_REMOTE_IMAGE_HELPER=@CMAKE_INSTALL_FULL_BINDIR@/wetypex-remote-image"
+Environment="QT_QPA_PLATFORM=offscreen"
+Environment="QT_IM_MODULE=none"
+StandardOutput=null
+StandardError=null
+ExecStart=@Python3_EXECUTABLE@ @CMAKE_INSTALL_FULL_BINDIR@/fcitx5-wetypex-syncd
+[Install]
+WantedBy=graphical-session.target
