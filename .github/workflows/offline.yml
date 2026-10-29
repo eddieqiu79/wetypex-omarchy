@@ -15,6 +15,20 @@ jobs:
           python3 -m py_compile tools/preflight.py omarchy/*.py tests/*.py compat/cloud/*.py
           python3 tests/check-wetypex-sync-stability.py
           python3 tests/check-arch-setup.py
+          python3 tests/check-update-policy.py
+          python3 tests/check-release-channel.py
           python3 tools/preflight.py
       - name: Check patch formatting
         run: git diff --check
+  desktop-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install isolated demo build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ qt6-base-dev
+      - name: Build and exercise simulated UI
+        run: |
+          cmake -S demo/desktop -B build/desktop-demo
+          cmake --build build/desktop-demo --parallel 2
+          ctest --test-dir build/desktop-demo --output-on-failure

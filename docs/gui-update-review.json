@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-29",
+  "reviewed_parent_commit": "92b35d3c01667a26ef1bb4d10546333a7178d033",
+  "scope": "Desktop prototype and fork release/update infrastructure",
+  "project_version": "0.1.0-dev",
+  "local_build": {
+    "architecture": "x86_64",
+    "cmake": "4.4.3",
+    "qt": "6.11.2",
+    "compiler": "GCC 16.2.1 with isolated Clang/libc++ bridge toolchain",
+    "dependency_record": "build-dependencies.json",
+    "kqueue_commit": "46a3e130f88b0b0742575dcb01d77e336538024b",
+    "bundled_curl": false,
+    "layer_shell": false,
+    "full_adapter_build": "passed",
+    "ctest_suites": 3,
+    "ctest_result": "passed"
+  },
+  "desktop_demo": {
+    "build": "passed",
+    "behavioral_test_slots": 9,
+    "tests": "passed using Qt offscreen",
+    "native_wayland_launch": "previously observed mapped and visible",
+    "screenshots": "synthetic, offscreen; no desktop capture or personal content",
+    "production_backend_connected": false
+  },
+  "update_channel": {
+    "inert_updater_tests": 3,
+    "release_policy_tests": 8,
+    "tests": "passed",
+    "workflow_yaml_parse": "passed; not a release workflow execution",
+    "live_release_query": "no-release",
+    "release_published": false
+  },
+  "boundaries": [
+    "No system package installation or replacement of the live input method",
+    "No service restart, identity access, pairing or clipboard payload access",
+    "No fresh official-device end-to-end or package upgrade/rollback acceptance",
+    "CI results must be checked against the exact commit after publication"
+  ]
+}

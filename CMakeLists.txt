@@ -83,7 +83,8 @@ target_compile_definitions(fcitx5-wetypex-settings PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
   WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
   WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-transfer"
-  WETYPE_VERSION="Omarchy ${WETYPE_OMARCHY_VERSION} (engine ${PROJECT_VERSION})")
+  WETYPE_UPDATE="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-update"
+  "WETYPE_VERSION=\"Omarchy ${WETYPE_OMARCHY_VERSION} (engine ${PROJECT_VERSION})\"")
 add_executable(fcitx5-wetypex-clipboard-set src/clipboard/main.cpp)
 target_link_libraries(fcitx5-wetypex-clipboard-set PRIVATE ${WETYPE_QT_PACKAGE}::Gui PkgConfig::WETYPE_WAYLAND)
 add_library(wetypex-config-ui MODULE src/configui/main.cpp)

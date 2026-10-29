@@ -27,9 +27,9 @@ runtime_tree = ast.parse((ROOT / 'scripts/setup_runtime.py').read_text())
 runtime_version = next(ast.literal_eval(n.value) for n in runtime_tree.body
                        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'UPSTREAM_VERSION' for t in n.targets))
 project_version = (ROOT / 'VERSION').read_text().strip()
-if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-dev)?', project_version):
-    p.error('VERSION must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-dev')
-version = project_version.replace('-dev', 'dev')
+if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-dev|-rc\.[1-9][0-9]*)?', project_version):
+    p.error('VERSION must be MAJOR.MINOR.PATCH, MAJOR.MINOR.PATCH-rc.N or MAJOR.MINOR.PATCH-dev')
+version = project_version.replace('-dev', 'dev').replace('-rc.', 'rc')
 if project_version.endswith('-dev'):
     version += '.r' + git('rev-list', '--count', 'HEAD') + '.g' + head[:12]
 out = a.output.resolve()

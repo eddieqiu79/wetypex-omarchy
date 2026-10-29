@@ -9,6 +9,8 @@ The project uses distinct identifiers for separate purposes:
 
 `wetypex-omarchy-setup --version` prints the installed project version. `pacman -Q wetypex-omarchy` prints the package version. Arch packages also install `/usr/share/fcitx5-wetypex/build-info.json`, which records the source commit, project/package versions, source checksum and supported runtime version. The settings version label identifies the fork and engine separately.
 
+Release candidates use `MAJOR.MINOR.PATCH-rc.N` and matching `vMAJOR.MINOR.PATCH-rc.N` tags; Arch maps this to `MAJOR.MINOR.PATCHrcN`. Local `vercmp` checks confirm development < rc < stable. The release channel refuses `-dev` tags, mismatched versions and reused release assets. See [updates](UPDATES.md).
+
 A stable release requires removing the development suffix in VERSION, validating the package and target environments, and publishing a matching reviewed tag and release. A tag or version label is not test evidence. No stable tag or release was created merely by introducing this version scheme. Build/release tools must not silently obtain or upgrade the proprietary runtime when the project version changes.
 
 The old engine-numbered CI artifact recorded in ARCH.md remains a historical validation result; it is not renamed or represented as a test of a newer commit.

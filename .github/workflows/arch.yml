@@ -3,6 +3,14 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        required: true
+        type: string
+      artifact_name:
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -21,6 +29,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          ref: ${{ inputs.source_ref || github.ref }}
       - name: Export and build as ordinary user
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE"
@@ -47,7 +56,7 @@ jobs:
       - name: Upload source manifest and package for review (not a release)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: wetypex-omarchy-arch-${{ github.sha }}
+          name: ${{ inputs.artifact_name || format('wetypex-omarchy-arch-{0}', github.sha) }}
           path: |
             /tmp/wetypex-build/*.pkg.tar.zst
             /tmp/wetypex-build/source-manifest.json

@@ -122,6 +122,19 @@ Long-duration operation, sleep and wake recovery, network interruptions, transfe
 
 ## Documentation
 
+### Desktop prototype preview
+
+The new GUI is currently a standalone interaction demo, not the installed settings/transfer application. It uses synthetic devices and memory-only settings; it does not send files. Build/run instructions are in [the demo guide](docs/DESKTOP-DEMO.md). The production settings application separately gains an explicit fork-update check.
+
+![Isolated file-transfer demo with synthetic devices](docs/images/desktop-demo-transfer.png)
+
+![Isolated input-settings demo with synthetic preferences](docs/images/desktop-demo-settings.png)
+
+- [Changelog](CHANGELOG.md): distinguish the isolated GUI prototype from changes to the installed adapter.
+- [Isolated desktop interaction demo](docs/DESKTOP-DEMO.md): a resizable Qt prototype for settings and file-transfer workflows, with simulated tasks and no connection to the live input method.
+- [Settings content inventory](docs/SETTINGS-CONTENT.md): configurable options, source mappings, and the distinction between UI controls, backend support and runtime validation.
+- [Updates and upstream integration](docs/UPDATES.md): the manual fork-package update route and the requirements for a future release channel.
+
 The detailed engineering records below are currently in Chinese:
 
 - [Changes and source provenance](docs/OMARCHY-CHANGES.md)

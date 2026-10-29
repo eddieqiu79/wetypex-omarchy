@@ -75,6 +75,8 @@ The explicit activation creates one Fcitx drop-in to suppress its own sync launc
 
 ## 5. Updates, deactivation, removal and recovery
 
+See [Updates and upstream integration](UPDATES.md) for the current manual update policy, the distinction between original WeTypeX source updates and this fork's packages, and requirements for a future release channel. The inherited upstream binary downloader is disabled in the revised source; installed older builds are unaffected until replaced. There is no configured pacman repository or automatic update channel for this fork.
+
 Updates use a newly built, inspected package via `pacman -U`. Retain the previous package for rollback; restart the affected user services only when authorized and after checking for active transfers/input. Runtime updates and account migration are separate operations and are not automatic.
 
 Before removing the package, undo this tool's activation as the desktop user:

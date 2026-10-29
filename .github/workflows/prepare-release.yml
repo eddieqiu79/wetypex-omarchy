@@ -1,0 +1,83 @@
+name: Prepare reviewed release draft
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing reviewed tag (vX.Y.Z or vX.Y.Z-rc.N)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-draft-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit: ${{ steps.version.outputs.commit }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: version
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python3 tools/prepare-release.py --tag "$RELEASE_TAG" > /tmp/validated-release.json
+          git merge-base --is-ancestor HEAD origin/main
+          test -f "docs/releases/$RELEASE_TAG.md"
+          python3 - <<'PY'
+          import json, os
+          data = json.load(open('/tmp/validated-release.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('commit=' + data['commit'] + '\n')
+              out.write('prerelease=' + str(data['prerelease']).lower() + '\n')
+          PY
+          python3 tests/check-update-policy.py
+          python3 tests/check-release-channel.py
+  build:
+    needs: validate
+    uses: ./.github/workflows/arch.yml
+    with:
+      source_ref: ${{ needs.validate.outputs.commit }}
+      artifact_name: release-candidate-${{ github.run_id }}
+  draft:
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-candidate-${{ github.run_id }}
+          path: /tmp/release-assets
+      - name: Validate release bundle
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
+          python3 tools/prepare-release.py --tag "$RELEASE_TAG" --assets /tmp/release-assets
+      - name: Create draft only (never publish or replace assets)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          IS_PREVIEW: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          flags=(--draft --verify-tag --latest=false)
+          if [ "$IS_PREVIEW" = true ]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" /tmp/release-assets/* \
+            --repo eddieqiu79/wetypex-omarchy "${flags[@]}" \
+            --title "WeTypeX Omarchy $RELEASE_TAG" \
+            --notes-file "docs/releases/$RELEASE_TAG.md"

@@ -1,0 +1,30 @@
+name: Upstream review report
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 9 * * 1'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Compare recorded upstream base with current head
+        run: |
+          python3 tools/check-upstream.py > /tmp/upstream-report.json
+          cat /tmp/upstream-report.json
+          python3 - <<'PY'
+          import json, os
+          data = json.load(open('/tmp/upstream-report.json'))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('# Upstream review\n\n')
+              out.write('Review required: ' + str(data['review_required']) + '\n\n')
+              out.write('[Compare source commits](' + data['compare'] + ')\n\n')
+              out.write('This job does not merge, build, release, or install upstream changes.\n')
+          if data['review_required']:
+              print('::warning::Upstream changed; maintainer review and regression are required.')
+          PY

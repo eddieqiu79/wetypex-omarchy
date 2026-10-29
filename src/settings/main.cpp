@@ -1435,14 +1435,59 @@ int main(int argc, char **argv) {
   feedback->setStyleSheet("border:0;background:transparent;");
   QObject::connect(feedback, &QToolButton::clicked, [] {
     QDesktopServices::openUrl(
-        QUrl("https://github.com/panxuc/fcitx5-wetypex/issues"));
+        QUrl("https://github.com/eddieqiu79/wetypex-omarchy/issues"));
   });
+  auto *manualUpdate = toggle(false, false);
+  manualUpdate->setToolTip(
+      "尚未提供自动更新通道；不会下载原始 WeTypeX 的软件包");
   about.body->addWidget(rowsCard(
-      {row("有新版本时自动更新", {},
-           toggle(wetype::settingBool(settings.value("auto_update"), true),
-                  true, "auto_update"),
-           48),
+      {row("软件更新", "目前通过已审核的 Arch 软件包手动更新", manualUpdate, 62),
        row("我要反馈", {}, feedback, 48)}));
+  auto *checkRelease = new QPushButton("检查稳定版更新");
+  auto *releaseStatus = new QLabel("只检查本项目发布版本，不自动下载安装。");
+  releaseStatus->setObjectName("rowSubtitle");
+  releaseStatus->setWordWrap(true);
+  releaseStatus->setTextFormat(Qt::PlainText);
+  about.body->addWidget(checkRelease);
+  about.body->addWidget(releaseStatus);
+  QObject::connect(checkRelease, &QPushButton::clicked, &window, [=, &window] {
+    checkRelease->setEnabled(false);
+    releaseStatus->setText("正在检查稳定版…");
+    auto *process = new QProcess(&window);
+    process->setProgram(QStringLiteral(WETYPE_UPDATE));
+    process->setArguments({"--check"});
+    auto *deadline = new QTimer(process);
+    deadline->setSingleShot(true);
+    QObject::connect(deadline, &QTimer::timeout, process, [process] { process->kill(); });
+    wetype::onProcessDone(process, &window, [=](int code, QProcess::ExitStatus) {
+      deadline->stop();
+      checkRelease->setEnabled(true);
+      const auto result = QJsonDocument::fromJson(process->readAllStandardOutput()).object();
+      const QMap<QString, QString> messages{
+          {"no-release", "目前尚无已发布的稳定版。"},
+          {"current", "此设置程序版本与当前稳定发布版本一致。"},
+          {"installed-newer", "此设置程序比当前发布版更新，不建议自动降级。"},
+          {"runtime-review-required", "新版本的引擎要求不同，需要先审核迁移步骤。"},
+          {"release-not-immutable", "发布记录尚未满足不可变要求，不能作为可靠升级来源。"},
+          {"installed-version-unknown", "无法识别当前版本，请核对安装来源。"},
+          {"unsupported-architecture", "此更新通道目前只支持 x86_64。"}};
+      const auto state = result.value("status").toString();
+      if (!code && state == "available")
+        releaseStatus->setText("发现新版本 " + result.value("version").toString() +
+                              "。请按更新说明验证来源并升级 Arch 包；尚未安装。");
+      else
+        releaseStatus->setText(!code && messages.contains(state) ? messages.value(state)
+                                    : "检查失败或超时，无法判断是否有更新；请稍后重试。");
+      process->deleteLater();
+    });
+    process->start();
+    deadline->start(45000);
+  });
+  auto *updateHelp = new QPushButton("查看升级与回退说明");
+  QObject::connect(updateHelp, &QPushButton::clicked, [] {
+    QDesktopServices::openUrl(QUrl("https://github.com/eddieqiu79/wetypex-omarchy/blob/main/docs/UPDATES.md"));
+  });
+  about.body->addWidget(updateHelp);
   about.body->addStretch();
   auto *copyright =
       new QLabel("WeTypeX 社区项目\n原版核心及相关商标归其权利人所有\n"

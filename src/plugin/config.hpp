@@ -220,7 +220,7 @@ FCITX_CONFIGURATION(
 
 FCITX_CONFIGURATION(UpdateConfig,
                     Option<bool> autoUpdate{this, "AutoUpdate",
-                                            "有新版本时自动更新", true};)
+                                            "旧版自动更新选项（本衍生版不启用）", false};)
 
 FCITX_CONFIGURATION(
     WeTypeConfig, Option<InputConfig> input{this, "Input", "输入"};
