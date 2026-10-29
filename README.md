@@ -1,39 +1,87 @@
 # WeTypeX Omarchy
 
-面向 Omarchy / Hyprland 的 WeTypeX 兼容修改版本。保留上游 Fcitx5 输入法与 macOS 引擎接入，补充文字、图片剪贴板的稳定性修复和文件传输入口。
+A community-maintained adaptation of [WeTypeX](https://github.com/panxuc/fcitx5-wetypex) for Omarchy and Hyprland, focused on Chinese input and reliable interoperability with the official WeType clients on macOS and iOS.
 
-基于 [panxuc/fcitx5-wetypex](https://github.com/panxuc/fcitx5-wetypex) 的 `291193a26938e0e8858d72b737066f37eb7a5f94`，不是腾讯官方产品。此仓库发布适配源码，不包含微信输入法官方程序、词库、模型、提取的界面资源或已配对身份。Mac、iPhone 继续使用官方微信输入法，不需额外安装客户端。
+The project builds on the upstream Fcitx5 integration and macOS engine compatibility layer. It adds clipboard reliability fixes, image format handling, an independent synchronization service, and a dedicated file transfer entry point.
 
-## 当前能力与边界
+Mac and iPhone users keep their existing official WeType clients. No additional application, agent, or background service is required on either Apple device.
 
-| 能力 | 本项目验证情况 |
-| --- | --- |
-| 中文输入 | Omarchy x86_64 / Hyprland 0.56.2 上已试打；用户主观反馈比之前 VType 方案更顺手，不代表候选延迟已量化 |
-| 模糊音 | 本机启用了 z/zh、c/ch、s/sh、in/ing；其他安装需自行配置 |
-| 文字剪贴板 | Linux ↔ Mac、Linux ↔ iPhone 四个方向均有人工成功记录 |
-| 图片剪贴板 | 四方向有成功记录；修复 JPEG 管道截断、图片引用解析与格式归一化；iPhone 入口可能需展开微信输入法键盘 |
-| 普通文件发送 | 四方向有人工成功记录，使用独立的文件传输窗口和局域网通路 |
-| `.md` / `.pdf` 文件直接复制粘贴 | **未实现**。Finder/文件管理器复制文件不等于发送文件；不会监听路径并自动上传 |
-| 长期稳定性与性能 | 已做离线回归和本机安装检查；尚未完成长期运行、全部休眠重连与负载测试 |
+The current source snapshot is based on upstream commit `291193a26938e0e8858d72b737066f37eb7a5f94` and targets Linux x86_64.
 
-这些是特定设备与版本的阶段性结果，不是所有版本或网络环境的兼容保证。Mac ↔ iPhone 的文件直接复制粘贴经用户澄清使用 Apple 原生接力，不能当作 Linux 协议验收证据。剪贴板图片转换为可粘贴静态 PNG，不承诺保留 HEIF 元数据、动图、多页或原文件字节。
+## Features
 
-## 相对上游的主要变化
+### Chinese Input on Linux
 
-- 剪贴板读取持续到 EOF，避免管道只读到一部分导致 JPEG 下半幅灰块。
-- 图片同步解析官方加密引用，校验下载长度、内容摘要与格式；暂时性下载失败保留重试机会。
-- 接收写入前重新检查本地剪贴板，避免网络请求期间的新复制被覆盖；接收后不回传。
-- 图片归一化支持 JPEG/JPG、PNG、HEIF/HEIC、AVIF、WebP、GIF、TIFF、BMP；实际可解码格式取决于系统图像插件。
-- 临时文件及时清理，持久化同步状态仅保留所需元数据，避免输出原始敏感响应。
-- 提供独立同步服务模板和单窗口文件传输入口；不会自动启用服务或替换已有输入法。
+- Fcitx5 integration for the Omarchy / Hyprland desktop.
+- Preserves the upstream input engine integration rather than replacing it with a new implementation.
+- Supports configurable fuzzy pinyin, including `z/zh`, `c/ch`, `s/sh`, and `in/ing`.
+- Runs clipboard synchronization and file transfers separately from the input method's interactive path.
 
-[变更与来源](docs/OMARCHY-CHANGES.md) · [构建和运行说明](docs/OMARCHY-OPERATIONS.md) · [验收范围](docs/OMARCHY-VALIDATION.md) · [上游原 README](docs/UPSTREAM-README.md)
+The input method has been manually tested on Omarchy with Hyprland 0.56.2. Typing comfort feedback is subjective; candidate latency and input responsiveness under transfer load have not yet been systematically measured.
 
-## 构建与离线回归
+### Bidirectional Clipboard Synchronization
 
-保留上游 CMake 结构，具体依赖见上游文档。需要 Fcitx5 开发文件、LibIME、Qt WebEngine、Clang/libc++、Python 3、cryptography。HEIF/AVIF 转换还需 PyGObject、GdkPixbuf 及相应格式插件。
+Text and image synchronization has been manually tested in all four directions:
 
-下面是隔离构建的基本形式；发行版缺少开发包时需要补齐依赖，不会代为安装系统包：
+| Direction | Text | Images |
+| --- | --- | --- |
+| Linux → macOS | Manually confirmed | Manually confirmed |
+| macOS → Linux | Pasted on Linux | Pasted on Linux |
+| Linux → iPhone | Received in the official WeType interface | Received in the official WeType interface |
+| iPhone → Linux | Pasted on Linux | Pasted on Linux, including JPEG and PNG samples |
+
+Reliability improvements include:
+
+- Reading image data until EOF to prevent truncated clipboard images.
+- Resolving encrypted image references and checking download completeness and content integrity.
+- Retrying transient image download failures.
+- Rechecking the local clipboard before applying remote content, so a newer local copy takes priority.
+- Preventing received clipboard content from being immediately uploaded again.
+- Establishing a startup baseline instead of uploading pre-existing clipboard content.
+- Removing temporary image files and limiting persisted synchronization metadata.
+
+On iPhone, receiving or accessing synchronized content may require opening the official WeType keyboard and its clipboard interface. Content appearing there does not necessarily mean it has been written to the iOS system clipboard.
+
+### Image Format Compatibility
+
+The image compatibility layer handles:
+
+- PNG
+- JPEG / JPG
+- HEIF / HEIC
+- AVIF
+- WebP
+- GIF
+- TIFF
+- BMP
+
+Supported images are normalized to a static PNG representation for clipboard compatibility. Actual decoding support depends on the installed system image plugins. Some formats have only been checked with synthetic offline fixtures, not in every device-to-device direction.
+
+This is image clipboard interoperability, not lossless file transfer: animation, multiple pages, metadata, and original file bytes are not guaranteed to be preserved.
+
+### File Transfers
+
+A dedicated transfer window supports sending and receiving ordinary files with paired official WeType clients over the local network.
+
+Manual transfers have succeeded between Linux and both macOS and iPhone in both directions. These results do not establish byte-for-byte verification for every direction or complete coverage of cancellation, rejection, and timeout behavior.
+
+**File transfer is separate from clipboard synchronization.** The project does not currently provide direct cross-device file copy and paste for `.md`, `.pdf`, or other files selected in a file manager. Copying a file path or URI does not automatically upload that file.
+
+The Mac ↔ iPhone file copy-and-paste behavior observed during testing used Apple's native continuity features. It is not evidence of a Linux-compatible file clipboard protocol.
+
+## Linux Integration
+
+- An independent synchronization service allows clipboard sync to operate separately from the currently selected input method.
+- A managed file transfer launcher provides a dedicated transfer window.
+- A single canonical pairing identity is used rather than duplicated account directories.
+- Service templates are included, but building or staging the project does not automatically enable services or replace an existing input method.
+- Cross-device clipboard tools should be coordinated to avoid competing writes and ambiguous synchronization results.
+
+## Building and Offline Tests
+
+The project retains the upstream CMake structure. Build dependencies include Fcitx5 development files, LibIME, Qt with WebEngine, Clang/libc++, Python 3, and cryptography. HEIF/AVIF conversion also requires PyGObject, GdkPixbuf, and the appropriate image format plugins.
+
+A basic isolated build uses:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -43,15 +91,56 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-本次导出验证复用了本机已经校验的依赖 sysroot，并使用系统 libcurl；以上默认 bundled-curl 路径并非本次重新验证的构建组合。完整构建结果和依赖版本见验收文档。构建和离线测试不需账号、配对或官方运行时；实际输入和互通需要用户另行获取运行时并使用官方关联流程。
+Missing development dependencies must be supplied separately; these commands do not install system packages or activate the input method.
 
-## 许可
+The source export was validated using an existing, verified dependency sysroot and system libcurl. The default bundled-curl configuration shown above was not the configuration revalidated for this export. See the validation record for the tested dependency versions and build settings.
 
-本项目免费提供，保留各部分原许可；“免费”不是额外的非商业限制，也不代表腾讯授权。
+Building and running the offline tests does not require an account, device pairing, or the proprietary runtime. Actual input and device interoperability require separately obtaining the runtime and using the official association workflow, subject to the applicable software terms.
 
-- WeTypeX 自有代码及对应补丁：MIT，保留 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
-- VType 图片兼容模块与其 Python 适配工具：GPLv3，见 [compat/LICENSE](compat/LICENSE)。
-- 新增 Omarchy 工具、测试与集成文件：GPL-3.0-only。
-- 腾讯的程序、词库、模型、界面资源和服务不受以上开源许可覆盖，不随源码分发。
+## Validation Status
 
-[许可清单及官方协议核对](LICENSES.md) 说明各部分边界。官方协议包含对未授权知识产权使用和逆向工程的限制；源码开源、免费提供或不分发运行时都不构成已取得官方授权的证明。上游 README 另有个人学习及 24 小时删除表述，本仓库保留原文，没有据此作合法性保证。
+The published source snapshot has passed:
+
+- A complete local CMake build.
+- Three offline regression suites covering synchronization behavior, image integrity, format decoding, and fragmented pipe input.
+- Staged installation checks for the compatibility helpers.
+- A source and Git metadata privacy review.
+
+Earlier device testing confirmed successful text, image, and file transfers in all four Linux ↔ Apple-device directions. These are results from specific devices and software versions, not a guarantee for every environment or a fresh end-to-end retest of the exported source snapshot.
+
+The official clients used during testing were WeType 3.0.0 (670) on Mac and 3.5.5 on iPhone.
+
+Long-duration operation, sleep and wake recovery, network interruptions, transfer cancellation, and large-file performance still need broader validation. No fixed latency, resource usage, or zero-overhead claims are made.
+
+## Documentation
+
+The detailed engineering records below are currently in Chinese:
+
+- [Changes and source provenance](docs/OMARCHY-CHANGES.md)
+- [Build, operation, and shutdown notes](docs/OMARCHY-OPERATIONS.md)
+- [Validation scope and outstanding checks](docs/OMARCHY-VALIDATION.md)
+- [Original upstream README](docs/UPSTREAM-README.md)
+- [Component licensing and official agreement review](LICENSES.md)
+
+Machine-readable records are also included:
+
+- [Upstream source manifest](docs/upstream-source-manifest.json)
+- [Build dependency versions and checksums](docs/build-dependencies.json)
+- [Offline regression results](docs/source-export-validation.json)
+
+## Upstream and Licensing
+
+This project is based on WeTypeX and retains its upstream structure, attribution, and license notices. Image compatibility components derived from [VType Linux](https://github.com/zhl-HFUT/vtype-linux) retain their applicable GPLv3 licensing.
+
+- WeTypeX's own adaptation code and corresponding patches: MIT; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+- VType image compatibility components and their Python adapters: GPLv3; see [compat/LICENSE](compat/LICENSE).
+- Additional Omarchy tools, integration files, and tests: GPL-3.0-only.
+- Tencent's proprietary software, resources, and services are not covered by these open-source licenses.
+
+The repository contains adaptation source code and synthetic test fixtures. It does not distribute proprietary WeType executables, dictionaries, language models, extracted interface resources, pairing identities, or private user data.
+
+WeTypeX Omarchy is an independent, unofficial project. It is not developed or endorsed by Tencent, and no Tencent authorization is claimed. Free and open-source distribution of the adaptation code does not grant rights to Tencent's proprietary software or services. The official agreement includes restrictions concerning unauthorized intellectual property use and reverse engineering.
+
+The original upstream README also contains personal-study and 24-hour deletion language alongside its MIT license notice. That wording is preserved in the archived upstream README and is not treated as a legal exemption or authorization.
+
+See [LICENSES.md](LICENSES.md) for component-specific licensing and the official software agreement review. Free distribution does not add a noncommercial restriction to the applicable MIT or GPL licenses.
