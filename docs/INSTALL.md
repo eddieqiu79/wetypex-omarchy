@@ -1,10 +1,13 @@
 # Installation and agent handoff
 
+Start with [Arch / Omarchy package installation](ARCH.md) for the fork-specific source exporter, package recipe, explicit user-service activation, update/removal and rollback boundaries. The sections below retain general environment and acceptance guidance; they are not a second installer.
+
+
 ## Status
 
 This is a source distribution, not a verified one-command installer. The existing `packaging/aur/PKGBUILD` downloads upstream WeTypeX releases and **does not install this fork's changes**. Other upstream package recipes are retained for reference and have not been validated as fork-specific releases. Do not substitute an upstream package and claim this fork is installed.
 
-The maintenance machine validated an isolated build and three offline regression suites, plus specific desktop and device interactions recorded in [OMARCHY-VALIDATION.md](OMARCHY-VALIDATION.md). A clean-machine installation, portable package, general migration, and rollback have not yet been validated. The documented sample build is not identical to the previously tested sysroot/system-curl build.
+The maintenance machine validated an isolated build and three offline regression suites, plus specific desktop and device interactions recorded in [OMARCHY-VALIDATION.md](OMARCHY-VALIDATION.md). Clean desktop activation, general migration, and rollback across dependency or runtime changes have not yet been validated. The documented sample build is not identical to the previously tested sysroot/system-curl build.
 
 ## Before making changes
 
@@ -33,4 +36,4 @@ There is currently no general, tested uninstall or rollback command. Before inst
 
 ## Remaining release work
 
-A fork-specific package recipe must use this repository's pinned source and verified checksum, a distinct package name and conflict policy, complete runtime/build dependencies and licenses, a safe install/upgrade/uninstall lifecycle, and no proprietary assets. Exercise the resulting package on clean Omarchy/Arch systems, including rollback, desktop activation, official-device interaction, and sleep/network recovery before presenting it as a supported release. A source-only GitHub Release or CI pass does not by itself prove those scenarios.
+The fork-specific recipe now exports the exact committed source with a checksum and its own package name, dependencies and conflict policy. The explicit user-service setup tool provides activation and deactivation; package rollback still requires compatible dependencies and a retained prior package. Exercise the resulting package on clean Omarchy/Arch systems, including rollback, desktop activation, official-device interaction, and sleep/network recovery before presenting it as a supported release. A source-only GitHub Release or CI pass does not by itself prove those scenarios.

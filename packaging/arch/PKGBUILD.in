@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Derived from panxuc/fcitx5-wetypex packaging; upstream notices retained.
+pkgname=wetypex-omarchy
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='WeTypeX adaptation for Omarchy: Fcitx5 input and clipboard/file interoperability'
+arch=('x86_64')
+url='https://github.com/eddieqiu79/wetypex-omarchy'
+license=('MIT' 'GPL-3.0-only' 'ISC' 'BSD-2-Clause')
+conflicts=('fcitx5-wetypex' 'fcitx5-wetypex-git')
+provides=('fcitx5-wetypex')
+depends=('fcitx5>=5.1.9' 'fcitx5-qt' 'libime>=1.1.15' 'libc++' 'json-c' 'curl>=8.9' 'openssl' 'bubblewrap' 'util-linux' 'python' 'python-cryptography' 'python-gobject' 'gdk-pixbuf2' 'libheif' 'libavif' 'python-fonttools' 'python-pillow' 'fontconfig' 'wayland' 'qt6-base' 'qt6-svg' 'qt6-webengine' 'qt6-imageformats' 'wl-clipboard' 'pipewire' 'ffmpeg' 'libnotify' 'polkit')
+makedepends=('cmake' 'clang' 'git' 'boost')
+optdepends=('fcitx5-configtool: add and select the input method')
+options=('!debug')
+source=('wetypex-omarchy-source.tar.gz')
+sha256sums=('@SHA256@')
+install=wetypex-omarchy.install
+build() {
+  cmake -S "$srcdir/source" -B "$srcdir/build" \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib -DFCITX_INSTALL_USE_FCITX_SYS_PATHS=OFF \
+    -DWETYPE_QT_VERSION=6 -DWETYPE_LAYER_SHELL=OFF -DWETYPE_BUNDLED_CURL=OFF
+  cmake --build "$srcdir/build" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-2}"
+}
+check() {
+  ctest --test-dir "$srcdir/build" --output-on-failure
+}
+package() {
+  DESTDIR="$pkgdir" cmake --install "$srcdir/build"
+  install -Dm644 "$srcdir/build/wetypex-sync.service" "$pkgdir/usr/lib/systemd/user/wetypex-sync.service"
+  install -Dm644 "$srcdir/source/docs/ARCH.md" "$pkgdir/usr/share/doc/fcitx5-wetypex/ARCH.md"
+}

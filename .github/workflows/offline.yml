@@ -14,6 +14,7 @@ jobs:
         run: |
           python3 -m py_compile tools/preflight.py omarchy/*.py tests/*.py compat/cloud/*.py
           python3 tests/check-wetypex-sync-stability.py
+          python3 tests/check-arch-setup.py
           python3 tools/preflight.py
       - name: Check patch formatting
         run: git diff --check

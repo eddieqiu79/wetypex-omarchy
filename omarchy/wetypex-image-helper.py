@@ -13,7 +13,9 @@ if sys.argv[1:]!=['--normalize-image']:
     os.execv(str(HELPER),[str(HELPER),*sys.argv[1:]])
 data=sys.stdin.buffer.read(8388609)
 if not data or len(data)>8388608:raise SystemExit(2)
-sys.path.insert(0,str(ROOT/'compat/cloud'))
+COMPAT=ROOT/'share/fcitx5-wetypex/compat/cloud'
+if not COMPAT.is_dir(): COMPAT=ROOT/'compat/cloud'
+sys.path.insert(0,str(COMPAT))
 from 图片格式 import sniff_image,convert_png,ImageConversionError
 mime=sniff_image(data)
 if mime in ('image/heic','image/avif'):

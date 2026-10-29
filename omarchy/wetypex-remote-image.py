@@ -11,7 +11,9 @@ import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'compat/cloud'))
+COMPAT = ROOT / 'share/fcitx5-wetypex/compat/cloud'
+if not COMPAT.is_dir(): COMPAT = ROOT / 'compat/cloud'
+sys.path.insert(0, str(COMPAT))
 from 剪贴板协议 import image_reference, image_cipher, cos_url
 from 图片格式 import sniff_image
 

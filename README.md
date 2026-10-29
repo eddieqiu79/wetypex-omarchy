@@ -79,7 +79,7 @@ The Mac ↔ iPhone file copy-and-paste behavior observed during testing used App
 
 ## Installation Status
 
-This repository does not yet provide a validated one-command installer or fork-specific package. The existing upstream AUR recipe downloads upstream releases, not this fork. Start with [Installation and agent handoff](docs/INSTALL.md) and the read-only `python3 tools/preflight.py`; building or staging does not activate the input method.
+Use [Arch / Omarchy installation](docs/ARCH.md) for this fork's `PKGBUILD` exporter, package build and explicit user-service setup. The old upstream AUR recipe is not this fork's installer. Start with the read-only `python3 tools/preflight.py`. The package does not obtain official runtime, pair devices, or silently change the desktop. Clean desktop/device validation remains necessary; CI packaging alone is not end-to-end acceptance.
 
 ## Building and Offline Tests
 

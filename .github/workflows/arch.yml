@@ -1,0 +1,52 @@
+name: Arch package
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 40
+    steps:
+      - name: Prepare clean Arch build environment
+        run: |
+          pacman -Syu --noconfirm git cmake clang boost fcitx5 fcitx5-qt libime libc++ json-c curl openssl bubblewrap util-linux python python-cryptography python-gobject gdk-pixbuf2 libheif libavif python-fonttools python-pillow fontconfig wayland qt6-base qt6-svg qt6-webengine qt6-imageformats wl-clipboard pipewire ffmpeg libnotify polkit
+          useradd -m builder
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Export and build as ordinary user
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- python3 tools/build-arch.py --output /tmp/wetypex-build --build
+      - name: Verify package and isolated installation
+        run: |
+          pacman -U --noconfirm /tmp/wetypex-build/wetypex-omarchy-*.pkg.tar.zst
+          pacman -Qkk wetypex-omarchy
+          test -f /usr/share/fcitx5-wetypex/compat/cloud/图片格式.py
+          test -f /usr/share/licenses/fcitx5-wetypex/WeTypeX-MIT.txt
+          test -f /usr/share/fcitx5-wetypex/compat/LICENSE
+          test -f /usr/lib/systemd/user/wetypex-sync.service
+          test ! -e /usr/compat
+          QT_QPA_PLATFORM=offscreen /usr/bin/wetypex-image-helper --normalize-image < fixtures/formats/synthetic.png > /tmp/check.png
+          python -c 'from pathlib import Path; assert Path("/tmp/check.png").read_bytes().startswith(b"\x89PNG")'
+          pacman -Q > /tmp/wetypex-build/build-packages.txt
+          cd /tmp/wetypex-build
+          sha256sum *.pkg.tar.zst > SHA256SUMS
+          pacman -R --noconfirm wetypex-omarchy
+          test ! -e /usr/bin/wetypex-image-helper
+          test ! -e /usr/lib/systemd/user/wetypex-sync.service
+      - name: Upload source manifest and package for review (not a release)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wetypex-omarchy-arch-${{ github.sha }}
+          path: |
+            /tmp/wetypex-build/*.pkg.tar.zst
+            /tmp/wetypex-build/source-manifest.json
+            /tmp/wetypex-build/build-packages.txt
+            /tmp/wetypex-build/SHA256SUMS
+          retention-days: 14

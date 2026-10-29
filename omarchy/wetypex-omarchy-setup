@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+"""Explicit per-user sync activation. Never obtains runtime or accesses identity."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+
+UNIT = 'wetypex-sync.service'
+DROP_CONTENT = '[Service]\nEnvironment=WETYPE_SYNCD_LAUNCHER=/usr/bin/true\n'
+
+def ctl(*args, check=True):
+    return subprocess.run(['systemctl', '--user', *args], check=check,
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def paths():
+    config = Path(os.environ.get('XDG_CONFIG_HOME', Path.home()/'.config'))
+    state = Path(os.environ.get('XDG_STATE_HOME', Path.home()/'.local/state'))
+    return config, state/'wetypex-omarchy/activation.json'
+
+def restore(config, record, state):
+    drop = config/'systemd/user'/f"{state['fcitx_service']}.d"/'90-wetypex-omarchy-sync.conf'
+    if not drop.is_file() or drop.read_text() != DROP_CONTENT:
+        raise RuntimeError('Activation drop-in changed or is missing; refusing to overwrite user changes.')
+    ctl('disable', '--now', UNIT)
+    drop.unlink()
+    ctl('daemon-reload')
+    ctl('restart', state['fcitx_service'])
+    record.unlink()
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('action', choices=('status', 'activate', 'deactivate'))
+    p.add_argument('--fcitx-service', help='Existing user unit, e.g. omarchy-fcitx5.service')
+    p.add_argument('--confirm', action='store_true', help='Authorize sync changes and restarting the selected Fcitx service')
+    a = p.parse_args()
+    config, record = paths()
+    if a.action == 'status':
+        print(json.dumps({'sync_active': ctl('is-active', '--quiet', UNIT, check=False).returncode == 0,
+                          'activation_record_present': record.exists(),
+                          'package_setup_present': Path('/usr/bin/fcitx5-wetypex-setup').is_file(),
+                          'local_plugin_present': (Path.home()/'.local/lib/fcitx5/wetypex.so').exists(),
+                          'user_sync_unit_present': (config/'systemd/user'/UNIT).exists(),
+                          'note': 'No clipboard or identity data was read. A running service does not prove interoperability.'}, indent=2))
+        return
+    if os.geteuid() == 0:
+        p.error('Run as the desktop user, never with sudo.')
+    if not a.confirm:
+        p.error('--confirm is required; this action changes sync service state and restarts Fcitx.')
+    if a.action == 'deactivate':
+        if not record.is_file(): p.error('No activation record; no changes made.')
+        restore(config, record, json.loads(record.read_text()))
+        print('Sync disabled and this tool\'s Fcitx drop-in removed. Account, runtime and dictionary data retained.')
+        return
+    service = a.fcitx_service or ''
+    if not re.fullmatch(r'[A-Za-z0-9_.@-]+\.service', service) or service == UNIT:
+        p.error('Supply an existing Fcitx user service via --fcitx-service.')
+    if record.exists(): p.error('Already managed; inspect status or deactivate before reactivating.')
+    if (config/'systemd/user'/UNIT).exists(): p.error('A user sync unit shadows the packaged unit; review migration first.')
+    if not Path('/usr/lib/systemd/user'/UNIT).is_file(): p.error('Install the Arch package first.')
+    if ctl('is-active', '--quiet', service, check=False).returncode:
+        p.error('Selected Fcitx service is not active; review the desktop startup configuration first.')
+    if ctl('is-active', '--quiet', UNIT, check=False).returncode == 0 or ctl('is-enabled', '--quiet', UNIT, check=False).returncode == 0:
+        p.error('Sync is already managed outside this tool; no changes made.')
+    drop = config/'systemd/user'/f'{service}.d'/'90-wetypex-omarchy-sync.conf'
+    if drop.exists(): p.error('Activation drop-in already exists; refusing to overwrite it.')
+    record.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    state = {'fcitx_service': service}
+    with record.open('x') as f:
+        os.chmod(record, 0o600)
+        json.dump(state, f)
+    drop.parent.mkdir(parents=True, exist_ok=True)
+    drop.write_text(DROP_CONTENT)
+    try:
+        ctl('daemon-reload')
+        ctl('restart', service)
+        ctl('enable', '--now', UNIT)
+        ctl('is-active', '--quiet', UNIT)
+    except subprocess.CalledProcessError:
+        print('Activation failed; attempting to remove this tool\'s configuration.')
+        restore(config, record, state)
+        raise RuntimeError('Activation did not complete; previous Fcitx sync-launch behavior restored.')
+    print('Sync activated. Pair through the official interface and test each direction with synthetic content.')
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (RuntimeError, OSError, subprocess.CalledProcessError) as e:
+        # Do not echo arbitrary command output or account responses.
+        print('Setup did not complete. Inspect service status and the activation record; no account data was removed.')
+        raise SystemExit(1)
