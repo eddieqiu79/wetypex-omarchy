@@ -1,11 +1,14 @@
 # 许可与来源核对（2026-10-29）
 
+**本仓库采用按组件区分的混合许可，不是整个仓库均为 MIT，也不宣称所有上游文件均已重新许可为 GPL。** 根目录 LICENSE 是索引，不是单一许可文本。
+
 这是一份工程来源记录，不是腾讯授权书或法律意见。代码许可、官方程序使用许可和在线服务条款是不同的范围。
 
 | 部分 | 来源与许可 | 本仓库处理 |
 | --- | --- | --- |
-| WeTypeX 自有适配代码 | panxuc/fcitx5-wetypex，MIT | 原始 LICENSE、NOTICE 不变；对应源码补丁沿用 MIT |
-| compat/cloud 三个 Python 模块 | zhl-HFUT/vtype-linux，GPLv3 | 保留完整对应源码、GPL 全文、来源及本地修改记录 |
+| WeTypeX 自有适配代码 | panxuc/fcitx5-wetypex，MIT | 原始 MIT 全文保存在 LICENSES/WeTypeX-MIT.txt，NOTICE 保留；对应源码补丁沿用 MIT |
+| compat/cloud/剪贴板协议.py、官方同步探针.py | 基于 zhl-HFUT/vtype-linux，GPLv3 | 保留对应源码、GPL 全文、上游基线和本地修改记录 |
+| compat/cloud/图片格式.py | 本项目新增图片格式兼容模块，GPL-3.0-only | 记录在 compat/NOTICE；此文件不属于所记录的 VType 上游基线 |
 | omarchy/、tests/、fixtures/、cmake/OmarchyCompatibility.cmake | 本项目适配与测试，GPL-3.0-only | 提供完整源码和合成测试数据；GPL 全文在 compat/LICENSE |
 | 新增说明文档 | 本项目，GPL-3.0-only | 遵守 GPLv3 复用；上游文档仍保留原许可与声明 |
 | wx-ime-sdk | mkdir700/wx-ime-sdk，Apache-2.0 | VType 协议模块注明参考来源；未打包 SDK 源码或二进制 |
@@ -16,7 +19,7 @@ WeTypeX 基线：`291193a26938e0e8858d72b737066f37eb7a5f94`。
 VType 基线：`46b496ad9a3d23633400021ae92600d208d44bd0`。
 历史 SDK 研究基线：`1ec70393cc9524c6c341cf768f090b0176586f72`，当前 WeTypeX 文件传输不通过独立 wxc 后台服务。
 
-MIT 与 GPL 允许免费提供；不要额外添加禁止商业使用条款，再宣称是同一份 MIT/GPL。根 LICENSE 不重新许可 GPL 模块。对包含 GPL 模块的分发，必须一并保留适用许可、修改声明及完整对应源码。独立进程边界不是豁免第三方许可义务的保证。
+MIT 与 GPL 允许免费提供；不要额外添加禁止商业使用条款，再宣称是同一份 MIT/GPL。根 LICENSE 是索引，不改变各组件的许可。MIT 代码与 GPL 代码的许可兼容，但整体组合的具体分发义务应按实际组合方式及各自条款判断。对包含 GPL 模块的分发，必须一并保留适用许可、修改声明及完整对应源码。独立进程边界不是豁免第三方许可义务的保证。
 
 ## 官方协议
 

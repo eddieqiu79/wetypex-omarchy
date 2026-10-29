@@ -1,4 +1,4 @@
-# Source: zhl-HFUT/vtype-linux; see ../NOTICE and ../LICENSE.
+# Local compatibility module; GPL-3.0-only. See ../NOTICE and ../LICENSE.
 # Omarchy source export with local compatibility changes: 2026-10-29.
 """常见位图的剪贴板兼容转换；文件内容识别，不依据扩展名。
 

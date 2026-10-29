@@ -130,9 +130,9 @@ Machine-readable records are also included:
 
 ## Upstream and Licensing
 
-This project is based on WeTypeX and retains its upstream structure, attribution, and license notices. Image compatibility components derived from [VType Linux](https://github.com/zhl-HFUT/vtype-linux) retain their applicable GPLv3 licensing.
+This repository uses component-specific licensing; it is not exclusively MIT or a blanket relicensing of all upstream files to GPL. It retains WeTypeX's upstream attribution and license notices. Compatibility modules derived from [VType Linux](https://github.com/zhl-HFUT/vtype-linux) retain their applicable GPLv3 licensing.
 
-- WeTypeX's own adaptation code and corresponding patches: MIT; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+- WeTypeX's own adaptation code and corresponding patches: MIT; see [LICENSES/WeTypeX-MIT.txt](LICENSES/WeTypeX-MIT.txt) and [NOTICE](NOTICE).
 - VType image compatibility components and their Python adapters: GPLv3; see [compat/LICENSE](compat/LICENSE).
 - Additional Omarchy tools, integration files, and tests: GPL-3.0-only.
 - Tencent's proprietary software, resources, and services are not covered by these open-source licenses.

@@ -1,7 +1,8 @@
 VType Linux compatibility modules (GPL version 3; see LICENSE).
 Source: https://github.com/zhl-HFUT/vtype-linux
 Base commit: 46b496ad9a3d23633400021ae92600d208d44bd0
-Files: cloud/剪贴板协议.py, cloud/图片格式.py, cloud/官方同步探针.py
+Derived from the pinned VType baseline: cloud/剪贴板协议.py and cloud/官方同步探针.py.
+cloud/图片格式.py is a local compatibility module and was not present at that baseline; it is distributed under GPL-3.0-only.
 Local image compatibility changes are included as complete corresponding source.
-These modules retain their original licensing; the root MIT license does not replace it.
+These modules retain their original licensing; the root license index does not replace them.
 Protocol research references wx-ime-sdk (Apache-2.0); no SDK binary is bundled.
