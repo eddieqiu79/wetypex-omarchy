@@ -38,6 +38,8 @@ jobs:
           python -c 'from pathlib import Path; assert Path("/tmp/check.png").read_bytes().startswith(b"\x89PNG")'
           pacman -Q > /tmp/wetypex-build/build-packages.txt
           cd /tmp/wetypex-build
+          # GitHub artifact filenames cannot contain colons; package metadata is unchanged.
+          for pkg in *.pkg.tar.zst; do safe=$(printf "%s" "$pkg" | tr : _); if [ "$pkg" != "$safe" ]; then mv -- "$pkg" "$safe"; fi; done
           sha256sum *.pkg.tar.zst > SHA256SUMS
           pacman -R --noconfirm wetypex-omarchy
           test ! -e /usr/bin/wetypex-image-helper

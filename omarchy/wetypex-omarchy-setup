@@ -92,7 +92,11 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (RuntimeError, OSError, subprocess.CalledProcessError) as e:
+    except RuntimeError as e:
+        # RuntimeError messages here are fixed diagnostic strings, not service output.
+        print('Setup did not complete:', e)
+        raise SystemExit(1)
+    except (OSError, subprocess.CalledProcessError):
         # Do not echo arbitrary command output or account responses.
         print('Setup did not complete. Inspect service status and the activation record; no account data was removed.')
         raise SystemExit(1)
