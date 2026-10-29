@@ -1,40 +1,48 @@
-# 许可与来源核对（2026-10-29）
+# Licenses and Source Provenance
 
-**本仓库采用按组件区分的混合许可，不是整个仓库均为 MIT，也不宣称所有上游文件均已重新许可为 GPL。** 根目录 LICENSE 是索引，不是单一许可文本。
+This repository contains components under different licenses. It is **not exclusively MIT**, and it does not claim to relicense all upstream files under the GPL. The root [LICENSE](LICENSE) is an index, not a single license covering every file.
 
-这是一份工程来源记录，不是腾讯授权书或法律意见。代码许可、官方程序使用许可和在线服务条款是不同的范围。
+This document records source provenance and license boundaries. It is not a grant of rights from Tencent or legal advice. The licenses for this project's code, the license for the official WeType software, and the terms governing official services are separate matters.
 
-| 部分 | 来源与许可 | 本仓库处理 |
+## Component licenses
+
+| Component | Source and license | Distribution in this repository |
 | --- | --- | --- |
-| WeTypeX 自有适配代码 | panxuc/fcitx5-wetypex，MIT | 原始 MIT 全文保存在 LICENSES/WeTypeX-MIT.txt，NOTICE 保留；对应源码补丁沿用 MIT |
-| compat/cloud/剪贴板协议.py、官方同步探针.py | 基于 zhl-HFUT/vtype-linux，GPLv3 | 保留对应源码、GPL 全文、上游基线和本地修改记录 |
-| compat/cloud/图片格式.py | 本项目新增图片格式兼容模块，GPL-3.0-only | 记录在 compat/NOTICE；此文件不属于所记录的 VType 上游基线 |
-| omarchy/、tests/、fixtures/、cmake/OmarchyCompatibility.cmake | 本项目适配与测试，GPL-3.0-only | 提供完整源码和合成测试数据；GPL 全文在 compat/LICENSE |
-| 新增说明文档 | 本项目，GPL-3.0-only | 遵守 GPLv3 复用；上游文档仍保留原许可与声明 |
-| wx-ime-sdk | mkdir700/wx-ime-sdk，Apache-2.0 | VType 协议模块注明参考来源；未打包 SDK 源码或二进制 |
-| libkqueue、libcurl、OpenSSL、LibIME、Qt 等 | 各自上游许可 | 通过依赖构建/系统提供；需遵守各依赖分发要求，不由根 MIT 一概覆盖 |
-| 官方微信输入法程序与资源 | 腾讯及相关权利人 | 未收录，不视为本项目开源代码 |
+| WeTypeX's own adapter code and corresponding patches | [panxuc/fcitx5-wetypex](https://github.com/panxuc/fcitx5-wetypex), MIT | The original [MIT license and copyright notice](LICENSES/WeTypeX-MIT.txt) and upstream [NOTICE](NOTICE) are retained. Corresponding patches are distributed under MIT. |
+| `compat/cloud/剪贴板协议.py` and `compat/cloud/官方同步探针.py` | Derived from [zhl-HFUT/vtype-linux](https://github.com/zhl-HFUT/vtype-linux), GPL version 3 | The source, [GPLv3 text](compat/LICENSE), [provenance notice](compat/NOTICE), upstream baseline, and local changes are retained. |
+| `compat/cloud/图片格式.py` | Locally added image-format compatibility module, GPL-3.0-only | This file was not present in the recorded VType baseline. See [compat/NOTICE](compat/NOTICE). |
+| `omarchy/`, `tests/`, `fixtures/`, and `cmake/OmarchyCompatibility.cmake` | This project's integration and tests, GPL-3.0-only | Source and synthetic fixtures are provided; the GPLv3 text is in [compat/LICENSE](compat/LICENSE). |
+| Newly added project documentation | This project, GPL-3.0-only | Upstream documentation retains its original notices and applicable license. |
+| wx-ime-sdk | [mkdir700/wx-ime-sdk](https://github.com/mkdir700/wx-ime-sdk), Apache-2.0 | Referenced in the VType protocol module's provenance. No SDK source or binary is bundled here. |
+| libkqueue, libcurl, OpenSSL, LibIME, Qt, and other dependencies | Their respective upstream licenses | Supplied through the build process or the system. Their applicable distribution requirements remain separate from this repository's component licenses. |
+| Official WeType software and resources | Tencent and relevant rights holders | Not included and not licensed as this project's open-source code. |
 
-WeTypeX 基线：`291193a26938e0e8858d72b737066f37eb7a5f94`。
-VType 基线：`46b496ad9a3d23633400021ae92600d208d44bd0`。
-历史 SDK 研究基线：`1ec70393cc9524c6c341cf768f090b0176586f72`，当前 WeTypeX 文件传输不通过独立 wxc 后台服务。
+Recorded baselines:
 
-MIT 与 GPL 允许免费提供；不要额外添加禁止商业使用条款，再宣称是同一份 MIT/GPL。根 LICENSE 是索引，不改变各组件的许可。MIT 代码与 GPL 代码的许可兼容，但整体组合的具体分发义务应按实际组合方式及各自条款判断。对包含 GPL 模块的分发，必须一并保留适用许可、修改声明及完整对应源码。独立进程边界不是豁免第三方许可义务的保证。
+- WeTypeX: [`291193a26938e0e8858d72b737066f37eb7a5f94`](https://github.com/panxuc/fcitx5-wetypex/tree/291193a26938e0e8858d72b737066f37eb7a5f94).
+- VType Linux: [`46b496ad9a3d23633400021ae92600d208d44bd0`](https://github.com/zhl-HFUT/vtype-linux/tree/46b496ad9a3d23633400021ae92600d208d44bd0).
+- Historical wx-ime-sdk research: [`1ec70393cc9524c6c341cf768f090b0176586f72`](https://github.com/mkdir700/wx-ime-sdk/tree/1ec70393cc9524c6c341cf768f090b0176586f72). The current WeTypeX file-transfer path does not use a separate, continuously running `wxc` service.
 
-## 官方协议
+The MIT and GPL licenses both permit free distribution. Adding a restriction that prohibits commercial use would not be the same as distributing under those unmodified licenses. MIT-licensed code can be compatible with GPL-licensed code, but the obligations for a particular combined distribution depend on how its components are combined and on their applicable terms. Distribution involving the GPL modules must preserve the applicable license notices and modification notices and satisfy the corresponding-source requirements where applicable. A process boundary alone does not establish an exemption from third-party license obligations.
 
-核对页面：[微信输入法软件许可及服务协议](https://wetype.weixin.qq.com/web/agreement)。页面显示更新及生效日期为 2026-05-11。2026-10-29 获取的 HTML SHA-256：
-`f6cc0d2c3c0f1df6d3379d1a227c6361f46717de6c8ee82d5160568b1e39a0f8`。
-页面会变化，使用时应重新查看适用条款。
+## Official WeType agreement
 
-- 3.2.1—3.2.3：个人、不可转让、非排他使用许可；非商业单终端使用及有限备份范围，未明示权利保留。
-- 8.1—8.2：官方软件及资源的知识产权归属；未获书面同意的相关知识产权使用限制涉及商业和非商业目的，并包含逆向工程相关限制。
-- 11：第三方软件仍适用各自许可。
+The [WeType Software License and Service Agreement](https://wetype.weixin.qq.com/web/agreement) reviewed on 2026-10-29 displayed an update date and an effective date of 2026-05-11. The SHA-256 of the HTML retrieved on that date was:
 
-因此，不能用“免费开源”证明已经获准分发官方引擎、开展所有兼容操作或调用官方服务。本仓库仅发布有来源的适配源码，不提供官方二进制包或授权承诺；兼容实现及服务使用是否获允许仍需结合适用法律、协议和具体事实判断。
+`f6cc0d2c3c0f1df6d3379d1a227c6361f46717de6c8ee82d5160568b1e39a0f8`
 
-上游 [原 README](docs/UPSTREAM-README.md) 同时存在 MIT 标识与个人学习、24 小时删除表述。这种说明与标准 MIT 授权的关系并无本项目取得的额外澄清；保留原文供读者评估，而不把该表述作为免责依据。
+The agreement may change; consult the version applicable to your use. The following is a summary of the reviewed version, not a substitute for its text:
 
-## 分发边界
+- Sections 3.2.1–3.2.3 describe a personal, non-transferable, non-exclusive license, noncommercial use on a single terminal, a limited backup copy, and the reservation of rights not expressly granted.
+- Sections 8.1–8.2 address intellectual property rights in the official software and resources, restrictions on certain uses without written permission for commercial or noncommercial purposes, and restrictions concerning reverse engineering.
+- Section 11 addresses third-party software and applicable third-party licenses.
 
-不收录官方安装包、提取的可执行文件/词库/模型/UI、账号身份、设备私钥、令牌、带签名下载地址、个人图片、收发文件、运行日志或现有用户配置。上游自动发布 workflows 不启用，当前发布仅为源码；制作二进制包时仍需独立复核所带依赖和资源。
+Free and open-source distribution does not establish permission to redistribute the official engine, perform every compatibility operation, or use official services. This repository provides adaptation source code with recorded provenance; it does not provide an official binary package or claim Tencent's authorization. Whether a particular implementation or use is permitted depends on the applicable law, agreement, and facts.
+
+The [archived upstream README](docs/UPSTREAM-README.md) contains both an MIT license indication and language about personal study and deletion within 24 hours. This project has not obtained an additional clarification about the relationship between that language and the MIT grant. The original text is retained for readers to assess; it is not treated as an exemption or authorization.
+
+## Distribution boundary
+
+The repository does not include official installation packages, extracted executables, dictionaries, models or UI resources, account identities, device private keys, tokens, signed download URLs, personal images, transferred files, runtime logs, or existing user configuration.
+
+Upstream automated release workflows are not enabled here. The current publication is source-only. Before distributing binary packages, review the included dependencies and resources and satisfy their respective license and source-distribution requirements.
