@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Prepare clean Arch build environment
         run: |
+          # The minimal image excludes docs by default; inspect the entire installed package.
+          sed -i '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
           pacman -Syu --noconfirm git cmake clang boost fcitx5 fcitx5-qt libime libc++ json-c curl openssl bubblewrap util-linux python python-cryptography python-gobject gdk-pixbuf2 libheif libavif python-fonttools python-pillow fontconfig wayland qt6-base qt6-svg qt6-webengine qt6-imageformats wl-clipboard pipewire ffmpeg libnotify polkit
           useradd -m builder
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -49,4 +51,7 @@ jobs:
             /tmp/wetypex-build/source-manifest.json
             /tmp/wetypex-build/build-packages.txt
             /tmp/wetypex-build/SHA256SUMS
+            /tmp/wetypex-build/PKGBUILD
+            /tmp/wetypex-build/wetypex-omarchy.install
+            /tmp/wetypex-build/wetypex-omarchy-source.tar.gz
           retention-days: 14
