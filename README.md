@@ -128,6 +128,14 @@ Machine-readable records are also included:
 - [Build dependency versions and checksums](docs/build-dependencies.json)
 - [Offline regression results](docs/source-export-validation.json)
 
+## Independent Project and Rights Notice
+
+WeTypeX Omarchy is an independent, unofficial compatibility project. It is not affiliated with, endorsed by, or authorized by Tencent or its affiliates. Names and trademarks belonging to Tencent or other rights holders are used only to identify the software and services with which this project seeks compatibility.
+
+This repository distributes adaptation source code and synthetic test data; it does not distribute the official WeType engine, installation package, dictionaries, models, or extracted interface resources. Running the project requires separately obtaining the relevant official runtime. Review and comply with the applicable [official WeType agreement](https://wetype.weixin.qq.com/web/agreement) and third-party licenses before obtaining or using that software or its services.
+
+The project does not claim that its open-source licenses or free distribution grant permission to use, modify, reverse engineer, or redistribute proprietary software, or to access official services. Compatibility and service availability may change. The software is provided without warranty as described in the applicable component licenses. Nothing in this notice overrides those licenses or any rights and obligations under applicable law. See [LICENSES.md](LICENSES.md) for sources and limitations.
+
 ## Upstream and Licensing
 
 This repository uses component-specific licensing; it is not exclusively MIT or a blanket relicensing of all upstream files to GPL. It retains WeTypeX's upstream attribution and license notices. Compatibility modules derived from [VType Linux](https://github.com/zhl-HFUT/vtype-linux) retain their applicable GPLv3 licensing.
