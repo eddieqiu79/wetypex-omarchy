@@ -103,6 +103,8 @@ Building and running the offline tests does not require an account, device pairi
 
 ## Validation Status
 
+A [clean Arch package build and install/remove check](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40857038300) passed for commit `b88e6e87988685ba811c9c04e8048293651e18bc`. See [Arch installation](docs/ARCH.md) for the artifact, checksums, and validation boundaries. This does not certify later commits or real desktop/device behavior.
+
 The published source snapshot has passed:
 
 - A complete local CMake build.

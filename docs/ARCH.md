@@ -8,6 +8,17 @@ Target: Omarchy/Arch Linux x86_64. Build uses system libcurl and Qt6, and disabl
 
 The adapter package excludes official runtime, dictionary, model and extracted UI assets. It does not pair devices, modify a default input method, activate services, or restart Fcitx during package installation. Packaging checks are separate from a clean Hyprland session and official-device acceptance tests.
 
+## Verified package build
+
+[Arch CI run 40857038300](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40857038300) passed for commit `b88e6e87988685ba811c9c04e8048293651e18bc`: clean Arch container build as an ordinary user, all three CTest suites, pacman installation, file integrity, installed image normalization, and package removal. No official runtime, account, desktop session, or Apple device was used in that run.
+
+The run's artifact includes the adapter package, source archive, concrete PKGBUILD, source commit/checksum manifest, package checksum, and installed dependency list. GitHub Actions artifacts require access through GitHub and expire after 14 days; they are review artifacts, not a permanent stable Release. A later checkout is not automatically covered by this result.
+
+Verified package: `wetypex-omarchy-2.2.3.657.r8.gb88e6e879886-1-x86_64.pkg.tar.zst`.
+SHA-256: `2ad5be95ea9897f99ad98bb618b14745f6cc25b910c4ab9dfdcd3e8402ab8c31`.
+
+Download through the linked run's Artifacts section, or use `gh run download 40857038300 --repo eddieqiu79/wetypex-omarchy --dir ./arch-artifact` with an authenticated GitHub CLI. Verify SHA256SUMS inside the extracted artifact directory before inspecting the package. Do not install automatically merely because a checksum matches; first check target architecture, dependency compatibility and conflicting deployments.
+
 ## 1. Inspect and build the exact checkout
 
 ```sh

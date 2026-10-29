@@ -45,4 +45,4 @@ The [archived upstream README](docs/UPSTREAM-README.md) contains both an MIT lic
 
 The repository does not include official installation packages, extracted executables, dictionaries, models or UI resources, account identities, device private keys, tokens, signed download URLs, personal images, transferred files, runtime logs, or existing user configuration.
 
-Upstream automated release workflows are not enabled here. The current publication is source-only. Before distributing binary packages, review the included dependencies and resources and satisfy their respective license and source-distribution requirements.
+Upstream automated release workflows are not enabled here. The fork's Arch CI can publish adapter-only package artifacts together with the corresponding source archive, build recipe, provenance manifest and checksums. These artifacts do not contain the official runtime. Before publishing a stable binary release, review the included dependencies and resources and satisfy their respective license and source-distribution requirements.
