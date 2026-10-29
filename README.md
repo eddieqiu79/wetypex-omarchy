@@ -1,5 +1,7 @@
 # WeTypeX Omarchy
 
+**Project version: 0.1.0-dev — development preview.** This is separate from the supported official runtime version, `2.2.3.657`. See [versioning](docs/VERSIONING.md).
+
 A community-maintained adaptation of [WeTypeX](https://github.com/panxuc/fcitx5-wetypex) for Omarchy and Hyprland, focused on Chinese input and reliable interoperability with the official WeType clients on macOS and iOS.
 
 The project builds on the upstream Fcitx5 integration and macOS engine compatibility layer. It adds clipboard reliability fixes, image format handling, an independent synchronization service, and a dedicated file transfer entry point.

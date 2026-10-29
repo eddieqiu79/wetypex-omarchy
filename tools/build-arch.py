@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Export a committed source snapshot and optionally build it with makepkg."""
 import argparse
+import ast
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,7 +23,15 @@ if git('status', '--porcelain', '--untracked-files=normal'):
 if a.build and os.geteuid() == 0:
     p.error('makepkg must run as an unprivileged build user.')
 head = git('rev-parse', 'HEAD')
-version = '2.2.3.657.r' + git('rev-list', '--count', 'HEAD') + '.g' + head[:12]
+runtime_tree = ast.parse((ROOT / 'scripts/setup_runtime.py').read_text())
+runtime_version = next(ast.literal_eval(n.value) for n in runtime_tree.body
+                       if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'UPSTREAM_VERSION' for t in n.targets))
+project_version = (ROOT / 'VERSION').read_text().strip()
+if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-dev)?', project_version):
+    p.error('VERSION must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-dev')
+version = project_version.replace('-dev', 'dev')
+if project_version.endswith('-dev'):
+    version += '.r' + git('rev-list', '--count', 'HEAD') + '.g' + head[:12]
 out = a.output.resolve()
 out.mkdir(parents=True, exist_ok=False)
 archive = out / 'wetypex-omarchy-source.tar.gz'
@@ -30,7 +40,7 @@ digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 recipe = (ROOT / 'packaging/arch/PKGBUILD.in').read_text().replace('@VERSION@', version).replace('@SHA256@', digest)
 (out / 'PKGBUILD').write_text(recipe)
 shutil.copy2(ROOT / 'packaging/arch/wetypex-omarchy.install', out)
-(out / 'source-manifest.json').write_text(json.dumps({'commit': head, 'version': version, 'source_sha256': digest}, indent=2)+'\n')
+(out / 'source-manifest.json').write_text(json.dumps({'commit': head, 'project_version': project_version, 'version': version, 'epoch': 1, 'runtime_version': runtime_version, 'source_sha256': digest}, indent=2)+'\n')
 print(json.dumps({'build_directory': str(out), 'commit': head, 'version': version}))
 if a.build:
     subprocess.run(['makepkg', '--cleanbuild', '--clean'], cwd=out, check=True)

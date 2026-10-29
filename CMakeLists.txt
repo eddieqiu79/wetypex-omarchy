@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(fcitx5-wetypex VERSION 2.2.3.657 LANGUAGES C CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" WETYPE_OMARCHY_VERSION LIMIT_COUNT 1)
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PKGBUILD.in"
   WETYPE_PACKAGE_RELEASE_LINE REGEX "^pkgrel=[0-9]+$")
 string(REGEX REPLACE "^pkgrel=" "" WETYPE_PACKAGE_RELEASE "${WETYPE_PACKAGE_RELEASE_LINE}")
@@ -82,7 +83,7 @@ target_compile_definitions(fcitx5-wetypex-settings PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
   WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
   WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-transfer"
-  WETYPE_VERSION="${PROJECT_VERSION}")
+  WETYPE_VERSION="Omarchy ${WETYPE_OMARCHY_VERSION} (engine ${PROJECT_VERSION})")
 add_executable(fcitx5-wetypex-clipboard-set src/clipboard/main.cpp)
 target_link_libraries(fcitx5-wetypex-clipboard-set PRIVATE ${WETYPE_QT_PACKAGE}::Gui PkgConfig::WETYPE_WAYLAND)
 add_library(wetypex-config-ui MODULE src/configui/main.cpp)

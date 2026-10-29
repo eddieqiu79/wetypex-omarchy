@@ -32,6 +32,11 @@ def restore(config, record, state):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    prefix = Path(__file__).resolve().parents[1]
+    version_file = prefix/'share/fcitx5-wetypex/VERSION'
+    if not version_file.is_file(): version_file = prefix/'VERSION'
+    version = version_file.read_text().strip() if version_file.is_file() else 'unknown'
+    p.add_argument('--version', action='version', version='WeTypeX Omarchy '+version)
     p.add_argument('action', choices=('status', 'activate', 'deactivate'))
     p.add_argument('--fcitx-service', help='Existing user unit, e.g. omarchy-fcitx5.service')
     p.add_argument('--confirm', action='store_true', help='Authorize sync changes and restarting the selected Fcitx service')

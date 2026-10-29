@@ -3,6 +3,8 @@
 pkgname=wetypex-omarchy
 pkgver=@VERSION@
 pkgrel=1
+# Transition from the earlier engine-numbered preview packages.
+epoch=1
 pkgdesc='WeTypeX adaptation for Omarchy: Fcitx5 input and clipboard/file interoperability'
 arch=('x86_64')
 url='https://github.com/eddieqiu79/wetypex-omarchy'
@@ -28,6 +30,7 @@ check() {
 }
 package() {
   DESTDIR="$pkgdir" cmake --install "$srcdir/build"
+  install -Dm644 "$startdir/source-manifest.json" "$pkgdir/usr/share/fcitx5-wetypex/build-info.json"
   install -Dm644 "$srcdir/build/wetypex-sync.service" "$pkgdir/usr/lib/systemd/user/wetypex-sync.service"
   install -Dm644 "$srcdir/source/docs/ARCH.md" "$pkgdir/usr/share/doc/fcitx5-wetypex/ARCH.md"
 }

@@ -1,0 +1,14 @@
+# Version identifiers
+
+The project uses distinct identifiers for separate purposes:
+
+- **Project version:** the root `VERSION` file, currently `0.1.0-dev`. It identifies this fork's adaptation and integration work. The `-dev` suffix explicitly marks a development preview, not a stable release.
+- **Source commit:** the exact Git SHA used to build the package. This is required when reporting a development-build problem.
+- **Official runtime version:** currently `2.2.3.657`, pinned independently by the upstream compatibility/setup code. It is not this fork's version and does not indicate the installed Mac/iPhone client version.
+- **Arch package version:** development exports use `0.1.0dev.r<commit-count>.g<short-SHA>`, plus `pkgrel`. Arch `epoch=1` ensures these packages supersede the earlier previews numbered after the engine. The epoch must be retained in subsequent package metadata. The package filename omits the epoch; pacman displays it as part of the full version.
+
+`wetypex-omarchy-setup --version` prints the installed project version. `pacman -Q wetypex-omarchy` prints the package version. Arch packages also install `/usr/share/fcitx5-wetypex/build-info.json`, which records the source commit, project/package versions, source checksum and supported runtime version. The settings version label identifies the fork and engine separately.
+
+A stable release requires removing the development suffix in VERSION, validating the package and target environments, and publishing a matching reviewed tag and release. A tag or version label is not test evidence. No stable tag or release was created merely by introducing this version scheme. Build/release tools must not silently obtain or upgrade the proprietary runtime when the project version changes.
+
+The old engine-numbered CI artifact recorded in ARCH.md remains a historical validation result; it is not renamed or represented as a test of a newer commit.

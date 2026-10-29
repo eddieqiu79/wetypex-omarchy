@@ -21,3 +21,5 @@ if(WETYPE_OMARCHY_TESTS)
 endif()
 
 install(PROGRAMS omarchy/wetypex-omarchy-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(FILES VERSION DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
