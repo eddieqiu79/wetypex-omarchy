@@ -6,7 +6,7 @@ Chinese input, clipboard sync and file transfer for **Omarchy / Hyprland**, buil
 
 Use Fcitx5 on Linux and keep the official WeType clients on Mac and iPhone. Neither Apple device needs an additional app or service.
 
-**Current release:** [0.1.0-rc.2](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.2), a preview candidate. **Target:** Arch / Omarchy, x86_64. The official runtime is pinned separately to `2.2.3.657`.
+**Current release:** [0.1.0-rc.3](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.3), a preview candidate. **Target:** Arch / Omarchy, x86_64. The official runtime is pinned separately to `2.2.3.657`.
 
 [Install and update](docs/RELEASE-INSTALL.md) · [Desktop guide](docs/DESKTOP.md) · [Contribute](CONTRIBUTING.md) · [Licenses](LICENSES.md)
 

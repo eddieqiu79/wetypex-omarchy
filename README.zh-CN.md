@@ -6,7 +6,7 @@
 
 Linux 使用 Fcitx5，Mac 和 iPhone 继续使用官方微信输入法，Apple 两端无需额外安装应用或常驻服务。
 
-**当前版本：**[0.1.0-rc.2](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.2)，候选版。**目标平台：**Arch / Omarchy，x86_64。官方运行时单独固定为 `2.2.3.657`。
+**当前版本：**[0.1.0-rc.3](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.3)，候选版。**目标平台：**Arch / Omarchy，x86_64。官方运行时单独固定为 `2.2.3.657`。
 
 [安装与更新](docs/RELEASE-INSTALL.md) · [桌面使用指南](docs/DESKTOP.md) · [参与贡献](CONTRIBUTING.zh-CN.md) · [许可说明](LICENSES.zh-CN.md)
 
