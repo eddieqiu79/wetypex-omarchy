@@ -47,6 +47,8 @@ jobs:
         run: |
           pacman -U --noconfirm /tmp/wetypex-build/wetypex-omarchy-*.pkg.tar.zst
           pacman -Qkk wetypex-omarchy
+          pkgver_qt=$(pkg-config --modversion Qt6Core)
+          pacman -Qip /tmp/wetypex-build/wetypex-omarchy-*.pkg.tar.zst | grep -F "qt6-base>=$pkgver_qt"
           sha256sum --check /tmp/user-state.sha256
           /usr/bin/fcitx5-wetypex-update --status
           /usr/bin/fcitx5-wetypex-account network-info

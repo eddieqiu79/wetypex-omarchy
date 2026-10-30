@@ -9,6 +9,7 @@ import re
 import subprocess
 
 UNIT = 'wetypex-sync.service'
+SYSTEM_UNIT_DIR = Path('/usr/lib/systemd/user')
 DROP_CONTENT = '[Service]\nEnvironment=WETYPE_SYNCD_LAUNCHER=/usr/bin/true\n'
 
 def ctl(*args, check=True):
@@ -64,7 +65,7 @@ def main():
         p.error('Supply an existing Fcitx user service via --fcitx-service.')
     if record.exists(): p.error('Already managed; inspect status or deactivate before reactivating.')
     if (config/'systemd/user'/UNIT).exists(): p.error('A user sync unit shadows the packaged unit; review migration first.')
-    if not Path('/usr/lib/systemd/user'/UNIT).is_file(): p.error('Install the Arch package first.')
+    if not (SYSTEM_UNIT_DIR / UNIT).is_file(): p.error('Install the Arch package first.')
     if ctl('is-active', '--quiet', service, check=False).returncode:
         p.error('Selected Fcitx service is not active; review the desktop startup configuration first.')
     if ctl('is-active', '--quiet', UNIT, check=False).returncode == 0 or ctl('is-enabled', '--quiet', UNIT, check=False).returncode == 0:

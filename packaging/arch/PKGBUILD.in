@@ -29,6 +29,8 @@ check() {
   ctest --test-dir "$srcdir/build" --output-on-failure
 }
 package() {
+  # Qt embeds its build-time minor symbol version in these GUI executables.
+  depends+=("qt6-base>=$(pkg-config --modversion Qt6Core)")
   DESTDIR="$pkgdir" cmake --install "$srcdir/build"
   install -Dm644 "$startdir/source-manifest.json" "$pkgdir/usr/share/fcitx5-wetypex/build-info.json"
   install -Dm644 "$srcdir/build/wetypex-sync.service" "$pkgdir/usr/lib/systemd/user/wetypex-sync.service"
