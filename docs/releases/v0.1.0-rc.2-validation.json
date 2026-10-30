@@ -1,0 +1,62 @@
+{
+  "version": "0.1.0-rc.2",
+  "date": "2026-10-29",
+  "release_commit": "ae25324888bea252d24f6f1c4a925c32cfd46876",
+  "release_url": "https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.2",
+  "immutable": true,
+  "prerelease": true,
+  "clean_arch_workflow": {
+    "result": "passed",
+    "url": "https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40999204724",
+    "scope": [
+      "exact-tag build",
+      "10 CTest suites",
+      "package installation",
+      "upgrade from retained development baseline",
+      "rollback and re-upgrade",
+      "removal",
+      "synthetic user-state preservation",
+      "installed engine dependency probe"
+    ]
+  },
+  "public_download": {
+    "result": "verified",
+    "checks": [
+      "release attestation",
+      "manifest and package asset attestations",
+      "source archive equality with reviewed export",
+      "SHA-256",
+      "package byte count",
+      "PKGINFO",
+      "installed build provenance",
+      "license paths"
+    ],
+    "package": "wetypex-omarchy-1_0.1.0rc2-1-x86_64.pkg.tar.zst",
+    "sha256": "53f52b7f145f7f37e3a66492684bf9f330c06e7d13b4c0c851a7c27d9f0b59c0",
+    "size": 1845856
+  },
+  "discovery": {
+    "preview": "v0.1.0-rc.2",
+    "stable": "no-release"
+  },
+  "desktop_acceptance": {
+    "source_commit": "95315f80a9431822461c5e2f476ade1950df65de",
+    "scope": "isolated native GUI on maintenance Hyprland desktop",
+    "explicit_file_transfer": {
+      "Linux -> macOS": "user-reported pass",
+      "macOS -> Linux": "user-reported pass",
+      "Linux -> iPhone": "user-reported pass",
+      "iPhone -> Linux": "user-reported pass"
+    },
+    "sequence": "macOS passed before the phone-specific fix; iPhone passed after the fix",
+    "hash_comparison": "not reported",
+    "clipboard_matrix_repeated_this_round": false,
+    "system_package_installation": "not performed; private-prefix deployment retained"
+  },
+  "pending": [
+    "exact package desktop input/settings and migration",
+    "restart, sleep/network recovery",
+    "long-duration behavior"
+  ],
+  "direct_file_clipboard_copy_paste": "not implemented"
+}
