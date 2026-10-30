@@ -19,3 +19,13 @@ This does not establish that the published Arch package has the same missing-dep
 - GUI account deadlines now allow the existing 20-second identity-lock wait plus the bounded account operation, instead of killing the process at the lock-wait boundary.
 
 The missing-dependency regression uses a synthetic failing host and proves that the account directory is not created. A successful device-list request is not a completed file transfer or a tested sync-preference change; those remain separate checks. No sync switches were changed automatically during diagnosis.
+
+## Subsequent phone-transfer credential failure
+
+The user subsequently confirmed bidirectional Linux/macOS file transfer in the isolated native GUI, but reported that the phone path displayed “Unable to save phone security credentials.” This is a user-reported desktop acceptance result, not a hash comparison or validation of the immutable release package on a clean host.
+
+Code inspection found that the phone path marked a dispatch as handled **before** checking and saving the peer certificate. The same error message covered both an absent certificate and an actual local write failure. If a certificate arrived in a later response with the same dispatch, the duplicate-dispatch guard prevented recovery. No live certificate or account identity was inspected to reach this finding; the exact response that triggered the user's failure was not captured, so a delayed certificate remains a possible cause rather than a confirmed server behavior.
+
+The fix waits for missing credentials within the existing connection deadline, rejects malformed base64 explicitly, and marks a dispatch handled only after both files have been saved. A failed write remains retryable. Certificate permissions are restricted to the owner before committing the file. The UI distinguishes waiting for a peer, an invalid response, and a local save error without displaying certificate contents. Synthetic regression coverage exercises missing and malformed credentials, a local write failure, successful recovery with the same dispatch, and suppression of a duplicate after launch.
+
+Phone file transfer still requires a new real-device retry in both directions. These changes do not restart the input method or clipboard service, create a new pairing, or modify the published immutable `v0.1.0-rc.1` assets.

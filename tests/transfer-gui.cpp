@@ -7,6 +7,54 @@
 class TransferTests : public QObject {
   Q_OBJECT
 private slots:
+  void phoneCredentialsCanArriveAfterDispatch() {
+    QTemporaryDir temp;
+    qputenv("WETYPE_DATA_ROOT", temp.path().toUtf8());
+    const auto state = temp.filePath("state/transfer");
+    QVERIFY(QDir().mkpath(state));
+    TransferWindow w;
+    w.active_ = true;
+    w.preloadedWxp2p_ = true;
+    // No network or real certificates: just keep the synthetic backend alive
+    // until stopSession sends quit.
+    w.session_.start("python3", {"-u", "-c",
+        "import sys,json\nfor line in sys.stdin:\n"
+        " if json.loads(line).get('action') == 'quit': break\n"});
+    QVERIFY(w.session_.waitForStarted());
+    const QByteArray dispatch("synthetic-dispatch");
+    w.startWxp2p(dispatch, {});
+    QVERIFY(w.status_->text().contains("等待手机返回"));
+    QVERIFY(w.lastDispatch_.isEmpty());
+    QVERIFY(!w.wxpStarted_);
+    QVERIFY(!QFile::exists(state + "/wxp2p-dispatch.bin"));
+    w.startWxp2p(dispatch, {{"public_cer", "invalid!base64"}});
+    QVERIFY(w.status_->text().contains("格式无效"));
+    QVERIFY(w.lastDispatch_.isEmpty());
+    const QByteArray certificate("synthetic-certificate-not-for-TLS");
+    const QJsonObject peer{{"public_cer", QString::fromLatin1(certificate.toBase64())}};
+    // Force a real local write failure, then recover using the same dispatch.
+    const auto caPath = state + "/peer-ca.pem";
+    QVERIFY(QDir().mkdir(caPath));
+    w.startWxp2p(dispatch, peer);
+    QVERIFY(w.status_->text().contains("本地保存失败"));
+    QVERIFY(w.lastDispatch_.isEmpty());
+    QVERIFY(!w.wxpStarted_);
+    QVERIFY(QDir().rmdir(caPath));
+    w.startWxp2p(dispatch, peer);
+    QCOMPARE(w.lastDispatch_, dispatch);
+    QVERIFY(w.wxpStarted_);
+    QFile ca(caPath);
+    QVERIFY(ca.open(QIODevice::ReadOnly));
+    QCOMPARE(ca.readAll(), certificate);
+    QVERIFY(!(ca.permissions() & (QFileDevice::ReadGroup | QFileDevice::WriteGroup |
+                                  QFileDevice::ReadOther | QFileDevice::WriteOther)));
+    const auto status = w.status_->text();
+    w.startWxp2p(dispatch, {});
+    QCOMPARE(w.status_->text(), status); // Already launched: ignore duplicates.
+    w.stopSession("test complete");
+    QTRY_COMPARE(w.session_.state(), QProcess::NotRunning);
+    qunsetenv("WETYPE_DATA_ROOT");
+  }
   void selectionRequiresLocalFilesAndExplicitSend() {
     QTemporaryDir temp;
     QFile f(temp.filePath("sample.md"));

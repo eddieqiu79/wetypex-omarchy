@@ -660,31 +660,46 @@ private:
   void startWxp2p(const QByteArray &dispatch, const QJsonObject &peer) {
     if (dispatch.isEmpty() || dispatch == lastDispatch_)
       return;
-    lastDispatch_ = dispatch;
-    if (wxpStarted_)
-      grpcAdvertised_ = false;
+    // Dispatch and peer credentials need not arrive in the same poll. Do not
+    // consume the dispatch until both have been persisted successfully, or a
+    // later response containing the certificate would be silently discarded.
+    const auto encodedCa = peer.value(QStringLiteral("public_cer"));
+    if (encodedCa.isUndefined() || encodedCa.isNull() ||
+        (encodedCa.isString() && encodedCa.toString().isEmpty())) {
+      status_->setText(QStringLiteral("等待手机返回安全凭据…（连接尚未就绪）"));
+      return;
+    }
+    const auto decodedCa = QByteArray::fromBase64Encoding(
+        encodedCa.toString().toLatin1(), QByteArray::AbortOnBase64DecodingErrors);
+    if (!encodedCa.isString() || !decodedCa || decodedCa.decoded.isEmpty()) {
+      status_->setText(QStringLiteral("手机安全凭据格式无效，等待有效响应…"));
+      return;
+    }
+    const QByteArray &peerCa = decodedCa.decoded;
     const QString root = dataRoot();
     const QString state = root + QStringLiteral("/state/transfer");
     const QString path = state + QStringLiteral("/wxp2p-dispatch.bin");
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) ||
         file.write(dispatch) != dispatch.size() || !file.commit()) {
-      status_->setText(QStringLiteral("无法保存手机传输调度信息"));
+      status_->setText(QStringLiteral("无法保存手机传输调度信息：%1")
+                           .arg(file.errorString()));
       return;
     }
     QFile::setPermissions(path,
                           QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     const QString peerCaPath = state + QStringLiteral("/peer-ca.pem");
-    const QByteArray peerCa = QByteArray::fromBase64(
-        peer.value(QStringLiteral("public_cer")).toString().toLatin1());
     QSaveFile peerCaFile(peerCaPath);
-    if (peerCa.isEmpty() || !peerCaFile.open(QIODevice::WriteOnly) ||
+    if (!peerCaFile.open(QIODevice::WriteOnly) ||
+        !peerCaFile.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner) ||
         peerCaFile.write(peerCa) != peerCa.size() || !peerCaFile.commit()) {
-      status_->setText(QStringLiteral("无法保存手机安全凭据"));
+      status_->setText(QStringLiteral("手机凭据已收到，但本地保存失败：%1")
+                           .arg(peerCaFile.errorString()));
       return;
     }
-    QFile::setPermissions(peerCaPath,
-                          QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    lastDispatch_ = dispatch;
+    if (wxpStarted_)
+      grpcAdvertised_ = false;
     if (preloadedWxp2p_ && !wxpStarted_ &&
         session_.state() == QProcess::Running) {
       wxpStarted_ = true;
