@@ -1,52 +1,80 @@
-# Licenses and Source Provenance
+# Licenses and source provenance
 
-This repository contains components under different licenses. It is **not exclusively MIT**, and it does not claim to relicense all upstream files under the GPL. The root [LICENSE](LICENSE) is an index, not a single license covering every file.
+**English** · [简体中文](LICENSES.zh-CN.md)
 
-This document records source provenance and license boundaries. It is not a grant of rights from Tencent or legal advice. The licenses for this project's code, the license for the official WeType software, and the terms governing official services are separate matters.
+WeTypeX Omarchy uses **component-specific licenses**. WeTypeX adapter code and its patches retain MIT; VType-derived modules retain GPLv3; the added Omarchy integration uses GPL-3.0-only. The root [LICENSE](LICENSE) is an index. It does not relicense the repository as a whole.
 
-## Component licenses
+This guide records licenses, sources and distribution boundaries. It is not legal advice or a grant of rights from Tencent. The original license texts govern the code they cover; neither language edition of this guide replaces those texts.
 
-| Component | Source and license | Distribution in this repository |
+## 1. Component map
+
+| Component | License and source | Notices and scope |
 | --- | --- | --- |
-| WeTypeX's own adapter code and corresponding patches | [panxuc/fcitx5-wetypex](https://github.com/panxuc/fcitx5-wetypex), MIT | The original [MIT license and copyright notice](LICENSES/WeTypeX-MIT.txt) and upstream [NOTICE](NOTICE) are retained. Corresponding patches are distributed under MIT. |
-| `compat/cloud/剪贴板协议.py` and `compat/cloud/官方同步探针.py` | Derived from [zhl-HFUT/vtype-linux](https://github.com/zhl-HFUT/vtype-linux), GPL version 3 | The source, [GPLv3 text](compat/LICENSE), [provenance notice](compat/NOTICE), upstream baseline, and local changes are retained. |
-| `compat/cloud/图片格式.py` | Locally added image-format compatibility module, GPL-3.0-only | This file was not present in the recorded VType baseline. See [compat/NOTICE](compat/NOTICE). |
-| `omarchy/`, `tests/`, `fixtures/`, and `cmake/OmarchyCompatibility.cmake` | This project's integration and tests, GPL-3.0-only | Source and synthetic fixtures are provided; the GPLv3 text is in [compat/LICENSE](compat/LICENSE). |
-| `demo/desktop/` | This project's isolated Qt Widgets interaction prototype, GPL-3.0-only | Original demo source and synthetic scenarios only; no extracted official interface assets. The GPLv3 text is in [compat/LICENSE](compat/LICENSE). |
-| Fork-specific release tools and workflows | This project's release-channel integration, GPL-3.0-only | See `tools/prepare-release.py`, `tools/check-upstream.py` and the fork's workflows. The existing updater template remains an MIT-licensed WeTypeX adapter patch. |
-| Newly added project documentation | This project, GPL-3.0-only | Upstream documentation retains its original notices and applicable license. |
-| wx-ime-sdk | [mkdir700/wx-ime-sdk](https://github.com/mkdir700/wx-ime-sdk), Apache-2.0 | Referenced in the VType protocol module's provenance. No SDK source or binary is bundled here. |
-| libkqueue, libcurl, OpenSSL, LibIME, Qt, and other dependencies | Their respective upstream licenses | Supplied through the build process or the system. Their applicable distribution requirements remain separate from this repository's component licenses. |
-| Official WeType software and resources | Tencent and relevant rights holders | Not included and not licensed as this project's open-source code. |
+| WeTypeX adapter code and corresponding patches | MIT · [panxuc/fcitx5-wetypex](https://github.com/panxuc/fcitx5-wetypex) | Original [MIT text and copyright](LICENSES/WeTypeX-MIT.txt) and [NOTICE](NOTICE) retained. Includes native desktop patches in `src/settings/`, `src/transfer/` and `src/common/`, and the existing updater template. |
+| `compat/cloud/剪贴板协议.py` and `compat/cloud/官方同步探针.py` | GPL version 3 · derived from [zhl-HFUT/vtype-linux](https://github.com/zhl-HFUT/vtype-linux) | See the [GPLv3 text](compat/LICENSE) and [provenance notice](compat/NOTICE). Source and local modifications are included. |
+| `compat/cloud/图片格式.py` | GPL-3.0-only · added in this project | This file was not part of the recorded VType baseline. See [compat/NOTICE](compat/NOTICE). |
+| `omarchy/`, `tests/`, `fixtures/`, `cmake/OmarchyCompatibility.cmake` | GPL-3.0-only · added in this project | Includes the package update client, integration tools and synthetic tests. License text: [compat/LICENSE](compat/LICENSE). |
+| `demo/desktop/` | GPL-3.0-only · added in this project | Original Qt Widgets prototype and synthetic scenarios; no extracted official UI assets. |
+| Fork-specific release tools and workflows | GPL-3.0-only · added in this project | Includes `tools/prepare-release.py`, `tools/check-upstream.py` and the fork's release workflows. This does not change the MIT license of the updater adapter template. |
+| Newly added project documentation | GPL-3.0-only | Upstream documents retain their original notices and applicable licenses. |
+| wx-ime-sdk | Apache-2.0 · [mkdir700/wx-ime-sdk](https://github.com/mkdir700/wx-ime-sdk) | Referenced in the VType protocol module's provenance. No SDK source or binary is bundled. |
+| libkqueue, libcurl, OpenSSL, LibIME, Qt and other dependencies | Respective upstream licenses | Supplied through the build process or the system. Their distribution requirements apply separately. |
+| Official WeType software and resources | Tencent and other relevant rights holders | Excluded from this distribution and from this project's open-source license grants. |
 
-Recorded baselines:
+## 2. Recorded sources
 
-- WeTypeX: [`291193a26938e0e8858d72b737066f37eb7a5f94`](https://github.com/panxuc/fcitx5-wetypex/tree/291193a26938e0e8858d72b737066f37eb7a5f94).
-- VType Linux: [`46b496ad9a3d23633400021ae92600d208d44bd0`](https://github.com/zhl-HFUT/vtype-linux/tree/46b496ad9a3d23633400021ae92600d208d44bd0).
-- Historical wx-ime-sdk research: [`1ec70393cc9524c6c341cf768f090b0176586f72`](https://github.com/mkdir700/wx-ime-sdk/tree/1ec70393cc9524c6c341cf768f090b0176586f72). The current WeTypeX file-transfer path does not use a separate, continuously running `wxc` service.
+| Project | Baseline commit |
+| --- | --- |
+| WeTypeX | [`291193a26938e0e8858d72b737066f37eb7a5f94`](https://github.com/panxuc/fcitx5-wetypex/tree/291193a26938e0e8858d72b737066f37eb7a5f94) |
+| VType Linux | [`46b496ad9a3d23633400021ae92600d208d44bd0`](https://github.com/zhl-HFUT/vtype-linux/tree/46b496ad9a3d23633400021ae92600d208d44bd0) |
+| wx-ime-sdk, historical research | [`1ec70393cc9524c6c341cf768f090b0176586f72`](https://github.com/mkdir700/wx-ime-sdk/tree/1ec70393cc9524c6c341cf768f090b0176586f72) |
 
-The MIT and GPL licenses both permit free distribution. Adding a restriction that prohibits commercial use would not be the same as distributing under those unmodified licenses. MIT-licensed code can be compatible with GPL-licensed code, but the obligations for a particular combined distribution depend on how its components are combined and on their applicable terms. Distribution involving the GPL modules must preserve the applicable license notices and modification notices and satisfy the corresponding-source requirements where applicable. A process boundary alone does not establish an exemption from third-party license obligations.
+The current WeTypeX file-transfer path does not use a separate, continuously running `wxc` service. A research reference does not mean that the referenced SDK is included in the package.
 
-## Official WeType agreement
+## 3. Redistribution and modifications
 
-The [WeType Software License and Service Agreement](https://wetype.weixin.qq.com/web/agreement) reviewed on 2026-10-29 displayed an update date and an effective date of 2026-05-11. The SHA-256 of the HTML retrieved on that date was:
+MIT and GPL permit distribution without charge, subject to their conditions. Publishing this project for free does not add a noncommercial restriction to either license.
 
-`f6cc0d2c3c0f1df6d3379d1a227c6361f46717de6c8ee82d5160568b1e39a0f8`
+Retain the applicable copyright, license and modification notices. Distribution involving GPL modules must meet the applicable corresponding-source requirements. MIT code can be compatible with GPL code, but the obligations for a combined distribution depend on how the components are combined and on their license terms. A process boundary alone does not establish an exemption.
 
-The agreement may change; consult the version applicable to your use. The following is a summary of the reviewed version, not a substitute for its text:
+The repository preserves upstream attribution. The Arch release bundle provides adapter code, the corresponding source archive, build recipe, provenance manifest and checksums. Review the dependencies and resources included in each binary distribution and meet their license and source-distribution requirements.
 
-- Sections 3.2.1–3.2.3 describe a personal, non-transferable, non-exclusive license, noncommercial use on a single terminal, a limited backup copy, and the reservation of rights not expressly granted.
-- Sections 8.1–8.2 address intellectual property rights in the official software and resources, restrictions on certain uses without written permission for commercial or noncommercial purposes, and restrictions concerning reverse engineering.
-- Section 11 addresses third-party software and applicable third-party licenses.
+## 4. Official software and services
 
-Free and open-source distribution does not establish permission to redistribute the official engine, perform every compatibility operation, or use official services. This repository provides adaptation source code with recorded provenance; it does not provide an official binary package or claim Tencent's authorization. Whether a particular implementation or use is permitted depends on the applicable law, agreement, and facts.
+WeTypeX Omarchy is an independent, unofficial project. It has no Tencent affiliation or endorsement and claims no Tencent authorization. Product names and trademarks identify the software and services targeted for compatibility.
 
-The [archived upstream README](docs/UPSTREAM-README.md) contains both an MIT license indication and language about personal study and deletion within 24 hours. This project has not obtained an additional clarification about the relationship between that language and the MIT grant. The original text is retained for readers to assess; it is not treated as an exemption or authorization.
+The repository and adapter packages exclude official installers, extracted executables, dictionaries, models and UI resources. They also exclude account identities, device private keys, tokens, signed download URLs, personal images, transferred files, runtime logs and existing user configuration. The official runtime must be obtained separately under its applicable terms. Upstream automated release workflows are not enabled here; this fork publishes its own adapter-only packages.
 
-## Distribution boundary
+The adaptation code's open-source licenses do not grant rights to use, modify, reverse engineer or redistribute Tencent's proprietary software, or to access official services. Free distribution and a disclaimer do not establish such permission. The applicable agreement, law and facts determine whether a particular use is permitted. Compatibility and service availability may change. Warranty terms remain those of the applicable component licenses; this notice does not override those licenses or applicable law.
 
-The repository does not include official installation packages, extracted executables, dictionaries, models or UI resources, account identities, device private keys, tokens, signed download URLs, personal images, transferred files, runtime logs, or existing user configuration.
+### Recorded agreement review
 
-Upstream automated release workflows are not enabled here. The fork's Arch CI can publish adapter-only package artifacts together with the corresponding source archive, build recipe, provenance manifest and checksums. These artifacts do not contain the official runtime. Before publishing a stable binary release, review the included dependencies and resources and satisfy their respective license and source-distribution requirements.
+The [WeType Software License and Service Agreement](https://wetype.weixin.qq.com/web/agreement), reviewed on **2026-10-29**, displayed **2026-05-11** as both its update and effective date. The retrieved HTML had this SHA-256:
 
-The native desktop changes in `src/settings/`, `src/transfer/`, and `src/common/` are MIT-licensed adaptation patches. The new `omarchy/wetypex-omarchy-package` client, GUI/release tests and release documentation are GPL-3.0-only. No proprietary UI resources are added to the distributed package.
+```text
+f6cc0d2c3c0f1df6d3379d1a227c6361f46717de6c8ee82d5160568b1e39a0f8
+```
+
+This is a dated record, not a claim that the agreement remains unchanged. Consult the version applicable to your use. The recorded summary was:
+
+| Sections | Subject |
+| --- | --- |
+| 3.2.1–3.2.3 | A personal, non-transferable, non-exclusive license; noncommercial use on a single terminal; a limited backup copy; reservation of rights not expressly granted. |
+| 8.1–8.2 | Intellectual property in the official software and resources; restrictions on certain uses without written permission, whether commercial or noncommercial; restrictions concerning reverse engineering. |
+| 11 | Third-party software and its applicable licenses. |
+
+This summary is not a substitute for the agreement itself. The project distributes adaptation code with recorded provenance, not an official Tencent binary package or a Tencent authorization.
+
+### Upstream wording
+
+The [archived upstream README](docs/UPSTREAM-README.md) includes an MIT license indication alongside personal-study and 24-hour deletion language. This project has not obtained clarification of how that wording relates to the MIT grant. The original text is preserved; it is not treated as a legal exemption or authorization.
+
+## 5. Original notices
+
+- [Root license index](LICENSE)
+- [WeTypeX MIT license and copyright](LICENSES/WeTypeX-MIT.txt)
+- [Upstream NOTICE](NOTICE)
+- [GPL version 3](compat/LICENSE)
+- [VType-derived module provenance](compat/NOTICE)
+
+The original notices and license texts are retained unchanged by this bilingual documentation update. The Chinese edition explains the same component mapping; it does not amend or replace a license.

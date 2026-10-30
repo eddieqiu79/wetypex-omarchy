@@ -1,10 +1,31 @@
-WeTypeX Omarchy contains components under different licenses.
+WeTypeX Omarchy — license index / 许可索引
 
-This file is a license index, not a single license for every file in this repository.
+English
 
-- WeTypeX upstream code and the corresponding patches: MIT; see LICENSES/WeTypeX-MIT.txt and NOTICE.
-- VType-derived compatibility modules: GPL version 3; see compat/LICENSE and compat/NOTICE.
-- New Omarchy integration, tests, and associated documentation: GPL-3.0-only; see compat/LICENSE.
+Licenses apply by component. This index does not grant a single license for
+the entire repository or replace the original license texts.
 
-See LICENSES.md for the detailed component mapping, provenance, and third-party terms.
-Tencent's proprietary software and resources are not covered by these licenses and are not distributed here.
+- WeTypeX adapter code and corresponding patches: MIT.
+  See LICENSES/WeTypeX-MIT.txt and NOTICE.
+- VType-derived compatibility modules: GPL version 3.
+  See compat/LICENSE and compat/NOTICE.
+- Added Omarchy integration, tests and associated documentation: GPL-3.0-only.
+  See compat/LICENSE.
+
+See LICENSES.md for the full component map, provenance and third-party terms.
+Tencent's proprietary software and resources are excluded from this
+project's distribution and are not covered by these license grants.
+
+简体中文
+
+许可按组件适用。本索引不对整个仓库授予单一许可，也不替代许可证原文。
+
+- WeTypeX 适配器及对应补丁：MIT。
+  见 LICENSES/WeTypeX-MIT.txt 和 NOTICE。
+- VType 衍生兼容模块：GPL 第 3 版。
+  见 compat/LICENSE 和 compat/NOTICE。
+- 新增 Omarchy 集成、测试及相关文档：GPL-3.0-only。
+  见 compat/LICENSE。
+
+完整组件对应关系、来源及第三方条款见 LICENSES.zh-CN.md。
+腾讯的专有软件和资源不在本项目发行内容中，也不受上述开源许可覆盖。

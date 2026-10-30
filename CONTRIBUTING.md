@@ -1,76 +1,79 @@
 # Contributing to WeTypeX Omarchy
 
-Thank you for helping improve this unofficial compatibility project. Contributions should address a specific, reproducible problem and preserve upstream provenance and component licenses.
+**English** · [简体中文](CONTRIBUTING.zh-CN.md)
 
-## Before you start
+Contributions should solve a concrete problem, preserve upstream provenance and include enough evidence for someone else to review the result. Small fixes can go straight to a pull request. For changes to architecture, runtime compatibility or installation behavior, open an issue or draft PR to discuss the approach first.
 
-- Read the [README](README.md), [license and provenance notes](LICENSES.md), and [upstream notice](NOTICE).
-- For substantial changes, describe the intended behavior and scope in an issue or draft pull request so maintainers can discuss the approach. This is guidance, not a requirement for small fixes.
-- Distinguish Linux integration problems from compatibility problems with a particular official runtime version and changes in external services.
-- Prefer focused patches that preserve the upstream module structure. Explain changes to engine ABI assumptions, supported runtime versions, and failure behavior.
-- Preserve existing input methods and user data. Installation, enabling services, changing defaults, restarting Fcitx, modifying firewall rules, and pairing should be explicit actions rather than hidden effects of a build or test.
+## 1. Understand the project
 
-## Rights, privacy, and test data
+Read the [README](README.md), [component licenses](LICENSES.md), [upstream notice](NOTICE) and [agent instructions](AGENTS.md). The maintained target is Arch / Omarchy x86_64 with Fcitx5 and Hyprland. Other environments need their own validation.
 
-- Do not commit or attach official installation packages, extracted executables, dictionaries, models, proprietary interface resources, or other material you lack permission to distribute. Obtain any required runtime separately and review the official terms.
-- Retain copyright and license notices. The repository contains MIT and GPL components; see [LICENSES.md](LICENSES.md) before copying or modifying code. Identify the source and license of new third-party material.
-- Never include account identities, private keys, tokens, pairing or transfer codes, signed URLs, clipboard contents, private messages, or personal files in issues, pull requests, logs, fixtures, or screenshots.
-- Use synthetic text, images, and files for tests. Sanitize diagnostic output before sharing it, including usernames, device identifiers, local paths, and network addresses where appropriate.
-- Do not report credentials or exploitable vulnerabilities in a public issue. Follow [SECURITY.md](SECURITY.md) and use private vulnerability reporting where available.
-- Do not assume that a disclaimer or an upstream open-source license grants rights to Tencent's software or services.
+Identify which part is affected: Linux desktop integration, the pinned official runtime, or an external service. Keep patches focused and follow the existing module structure. Changes to engine ABI assumptions, dependencies or supported runtime versions need an explicit explanation.
 
-## Development and build
+Preserve existing input methods, settings and user data. Installing packages, enabling services, changing defaults, restarting Fcitx, changing firewall rules and pairing devices must be explicit setup actions, not side effects of a build or test.
 
-The current validated target is Linux x86_64 with Fcitx5; the maintenance machine used Omarchy and Hyprland. Consult the README for dependencies and tested build limitations. A basic isolated build and offline test run is:
+## 2. Build in isolation
+
+Record the checkout and inspect the environment:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX="$HOME/.local/lib/wetypex-omarchy" \
-  -DCMAKE_INSTALL_LIBDIR=lib -DFCITX_INSTALL_USE_FCITX_SYS_PATHS=OFF
-cmake --build build --parallel 2
-ctest --test-dir build --output-on-failure
+git rev-parse HEAD
+git status --short
+python3 tools/preflight.py
 ```
 
-These are source-build instructions, not a validated one-command installer. The published export was tested with a verified dependency sysroot and system libcurl; the default bundled-curl combination above was not independently revalidated. Missing development dependencies, a suitable compiler and libc++, Qt image plugins, and other distribution-specific requirements may need separate setup. Consult the [validation record](docs/OMARCHY-VALIDATION.md) and [upstream documentation](docs/UPSTREAM-README.md).
+Use the [README build commands](README.md#build-from-source). They select Qt6 and system libcurl, matching the Arch recipe. Check [package dependencies](packaging/arch/PKGBUILD.in) before building; preflight reports availability but does not install missing dependencies or prove desktop connectivity. The [Arch guide](docs/ARCH.md) covers source exports and package builds.
 
-To inspect installation contents without installing into the configured prefix:
+To inspect installation output without writing to the configured prefix:
 
 ```sh
 DESTDIR="$PWD/stage" cmake --install build
 ```
 
-The stage is not a relocatable installation: upstream executables may contain the configured final prefix. Building and offline tests do not require an account or official runtime. Actual input and interoperability require an independently obtained official runtime, explicit setup, and pairing; follow the applicable terms and record which operations were actually performed.
+A staged tree is not a portable installation: generated files and binaries can contain the configured final prefix. Offline tests need no account or official runtime. Actual input and cross-device tests need separately prepared runtime and official pairing. Never duplicate identity directories to create parallel clients.
 
-## Testing and evidence
+## 3. Test the behavior you changed
 
-Choose checks relevant to the change and describe their results accurately:
+| Layer | What to check | What to report |
+| --- | --- | --- |
+| Build and offline tests | Build affected targets; run relevant CTest suites with synthetic inputs. | Exact commit, commands, results and failures. |
+| Linux desktop | Use the affected applications in the target session. | Distribution, architecture, compositor, Fcitx version, Wayland/XWayland and application type. |
+| Official devices | Test each affected direction and content type separately. | Client/runtime versions, what arrived, and what could actually be pasted or saved. |
+| Daily use | Where relevant, test reconnect, sleep/wake, concurrent clipboard tools and transfers during typing. | Observed failures and scenarios not tested. |
 
-1. **Source and offline tests:** build affected targets and run relevant CTest checks. For clipboard changes, cover interruption, integrity, retries, and ordering of local and remote updates where relevant.
-2. **Local desktop behavior:** identify the distribution, architecture, compositor, Fcitx version, application type, and whether the test used Wayland or XWayland.
-3. **Official-device interoperability:** state official client versions and test each relevant direction separately. A service starting or a successful CLI response is not proof that another device received or saved data.
-4. **Daily-use behavior:** where relevant, check reconnect, sleep and wake, coexistence with clipboard managers, and responsiveness during transfers. Clearly mark cases that were not tested.
+For clipboard changes, cover incomplete reads, integrity failures, retries, duplicate handling and ordering between local and remote copies where relevant. For images on iPhone, distinguish content visible in WeType from content available in the system clipboard.
 
-For images, distinguish receipt in the iPhone WeType interface from availability in the iOS system clipboard. For files, distinguish an invitation from acceptance, an established data connection, and a completely saved file. Compare hashes when both endpoints make the original bytes available; otherwise state the level of verification.
+For files, distinguish an invitation, acceptance, a data connection and a completely saved file. Compare hashes when both endpoints expose the original bytes; otherwise state the verification limit. A running service or successful CLI response does not prove that the other device received the data.
 
-Direct cross-device file copy and paste is not currently implemented. Do not treat a copied file path, a file-transfer window, or Apple-native continuity between Mac and iPhone as proof that this feature works on Linux.
+Direct cross-device file copy/paste is not implemented. A copied path, a transfer window or Apple continuity between Mac and iPhone does not establish Linux file-clipboard support.
 
-## Coding and design expectations
+## 4. Keep runtime behavior predictable
 
-- Follow the existing style and naming in the file you change. C++ standards vary by target; do not assume every target is compiled with the same language standard.
-- Keep input responsive when synchronization or file transfers fail. Avoid blocking the input path on network operations.
-- Preserve a single pairing identity and coordinate state writers and lock ownership. Do not duplicate private identity directories to work around concurrency.
-- Do not expose sensitive responses in logs. Do not mark an operation successful before the relevant outcome has actually occurred.
-- Preserve clipboard source, deduplication, acknowledgement, and local-content priority behavior. Do not automatically upload files merely because a clipboard contains a path or URI.
-- For UI changes, identify the platform and version used as a reference and explain intentional differences.
+- Follow the style of the file you edit. C++ language standards differ by target.
+- Keep network waits out of the interactive input path. Sync and transfer failures must not block typing.
+- Use one canonical pairing identity. Coordinate state writers, locks and renewal instead of copying private state or weakening locks to bypass contention.
+- Preserve clipboard origin, deduplication, acknowledgement and local-content priority. Do not upload files merely because a path or URI appears on the clipboard.
+- Report success only after the relevant outcome. Keep sensitive responses out of logs.
+- For UI work, identify the reference platform/version and explain intentional differences. Use synthetic state for screenshots and automated tests.
 
-## Issues and pull requests
+## 5. Protect data and preserve licenses
 
-A useful report or pull request includes:
+Use synthetic text, images and files. Before sharing diagnostics, remove account identities, private keys, tokens, pairing/transfer codes, signed URLs, clipboard contents, private messages and personal files. Also check screenshots and local paths for usernames, device identifiers and network details that are unnecessary to the report.
 
-- The problem, steps to reproduce it, and expected and observed behavior.
-- The repository commit, distribution and version, CPU architecture, compositor, Fcitx version, and relevant official client/runtime versions.
-- The affected direction and content type for synchronization or transfer issues, using only synthetic examples.
-- Checks actually run and their outcomes, including failures and untested scenarios.
-- Changes to dependencies, third-party material, license notices, compatibility assumptions, installation behavior, or user-visible configuration.
+Do not commit official installers, extracted executables, dictionaries, models or proprietary interface resources. Obtain required runtime separately and review its terms. Retain copyright and license notices; identify the source and license of any new third-party material. See [LICENSES.md](LICENSES.md) for the MIT/GPL component boundaries. A disclaimer or an adapter's open-source license does not grant rights to Tencent's software or services.
 
-Do not include private logs or files. If you cannot test a scenario, say so; untested work can still be reviewed without presenting it as a completed end-to-end result.
+Report exploitable vulnerabilities and credential exposure privately, following [SECURITY.md](SECURITY.md). Use GitHub's private vulnerability reporting where available; do not place secrets in a public issue.
+
+## 6. Submit a useful issue or pull request
+
+Include:
+
+- **Problem:** steps to reproduce, expected behavior and actual behavior.
+- **Environment:** commit or release, distribution, architecture, compositor, Fcitx and relevant official client/runtime versions.
+- **Scope:** affected direction and content type; for example, iPhone → Linux JPEG clipboard or Linux → Mac file transfer.
+- **Change:** the resulting behavior and any dependency, license, installation or configuration changes.
+- **Validation:** checks actually run, their results, known failures and untested cases.
+
+Keep the description about the final patch. Link related issues and explain non-obvious tradeoffs. Untested work can still be reviewed when the missing evidence is stated clearly. Do not attach raw private logs or user files to fill that gap.
+
+For release work, follow [the publishing workflow](docs/UPDATES.md#maintainer-publishing-workflow). Published assets are immutable; changed packages need a new version. Offline or container checks alone do not qualify a candidate as a stable desktop release.

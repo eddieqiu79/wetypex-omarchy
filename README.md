@@ -1,186 +1,106 @@
 # WeTypeX Omarchy
 
-**Project version: 0.1.0-rc.2 — release candidate, not yet stable.** This is separate from the supported official runtime version, `2.2.3.657`. See [versioning](docs/VERSIONING.md).
+**English** · [简体中文](README.zh-CN.md)
 
-A community-maintained adaptation of [WeTypeX](https://github.com/panxuc/fcitx5-wetypex) for Omarchy and Hyprland, focused on Chinese input and reliable interoperability with the official WeType clients on macOS and iOS.
+Chinese input, clipboard sync and file transfer for **Omarchy / Hyprland**, built on [WeTypeX](https://github.com/panxuc/fcitx5-wetypex).
 
-The project builds on the upstream Fcitx5 integration and macOS engine compatibility layer. It adds clipboard reliability fixes, image format handling, an independent synchronization service, and a dedicated file transfer entry point.
+Use Fcitx5 on Linux and keep the official WeType clients on Mac and iPhone. Neither Apple device needs an additional app or service.
 
-Mac and iPhone users keep their existing official WeType clients. No additional application, agent, or background service is required on either Apple device.
+**Current release:** [0.1.0-rc.2](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.2), a preview candidate. **Target:** Arch / Omarchy, x86_64. The official runtime is pinned separately to `2.2.3.657`.
 
-The current source snapshot is based on upstream commit `291193a26938e0e8858d72b737066f37eb7a5f94` and targets Linux x86_64.
-
-## Features
-
-### Chinese Input on Linux
-
-- Fcitx5 integration for the Omarchy / Hyprland desktop.
-- Preserves the upstream input engine integration rather than replacing it with a new implementation.
-- Supports configurable fuzzy pinyin, including `z/zh`, `c/ch`, `s/sh`, and `in/ing`.
-- Runs clipboard synchronization and file transfers separately from the input method's interactive path.
-
-The input method has been manually tested on Omarchy with Hyprland 0.56.2. Typing comfort feedback is subjective; candidate latency and input responsiveness under transfer load have not yet been systematically measured.
-
-### Bidirectional Clipboard Synchronization
-
-Text and image synchronization has been manually tested in all four directions:
-
-| Direction | Text | Images |
-| --- | --- | --- |
-| Linux → macOS | Manually confirmed | Manually confirmed |
-| macOS → Linux | Pasted on Linux | Pasted on Linux |
-| Linux → iPhone | Received in the official WeType interface | Received in the official WeType interface |
-| iPhone → Linux | Pasted on Linux | Pasted on Linux, including JPEG and PNG samples |
-
-Reliability improvements include:
-
-- Reading image data until EOF to prevent truncated clipboard images.
-- Resolving encrypted image references and checking download completeness and content integrity.
-- Retrying transient image download failures.
-- Rechecking the local clipboard before applying remote content, so a newer local copy takes priority.
-- Preventing received clipboard content from being immediately uploaded again.
-- Establishing a startup baseline instead of uploading pre-existing clipboard content.
-- Removing temporary image files and limiting persisted synchronization metadata.
-
-On iPhone, receiving or accessing synchronized content may require opening the official WeType keyboard and its clipboard interface. Content appearing there does not necessarily mean it has been written to the iOS system clipboard.
-
-### Image Format Compatibility
-
-The image compatibility layer handles:
-
-- PNG
-- JPEG / JPG
-- HEIF / HEIC
-- AVIF
-- WebP
-- GIF
-- TIFF
-- BMP
-
-Supported images are normalized to a static PNG representation for clipboard compatibility. Actual decoding support depends on the installed system image plugins. Some formats have only been checked with synthetic offline fixtures, not in every device-to-device direction.
-
-This is image clipboard interoperability, not lossless file transfer: animation, multiple pages, metadata, and original file bytes are not guaranteed to be preserved.
-
-### File Transfers
-
-A dedicated transfer window supports sending and receiving ordinary files with paired official WeType clients over the local network.
-
-Manual transfers have succeeded between Linux and both macOS and iPhone in both directions. These results do not establish byte-for-byte verification for every direction or complete coverage of cancellation, rejection, and timeout behavior.
-
-**File transfer is separate from clipboard synchronization.** The project does not currently provide direct cross-device file copy and paste for `.md`, `.pdf`, or other files selected in a file manager. Copying a file path or URI does not automatically upload that file.
-
-The Mac ↔ iPhone file copy-and-paste behavior observed during testing used Apple's native continuity features. It is not evidence of a Linux-compatible file clipboard protocol.
-
-## Linux Integration
-
-- An independent synchronization service allows clipboard sync to operate separately from the currently selected input method.
-- A managed file transfer launcher provides a dedicated transfer window.
-- A single canonical pairing identity is used rather than duplicated account directories.
-- Service templates are included, but building or staging the project does not automatically enable services or replace an existing input method.
-- Cross-device clipboard tools should be coordinated to avoid competing writes and ambiguous synchronization results.
+[Install and update](docs/RELEASE-INSTALL.md) · [Desktop guide](docs/DESKTOP.md) · [Contribute](CONTRIBUTING.md) · [Licenses](LICENSES.md)
 
 ## Install and update
 
-Use [verified GitHub Release installation](docs/RELEASE-INSTALL.md) for persistent Arch packages and subsequent updates. The preview channel is explicit; stable will remain empty until candidate desktop/device acceptance is complete. The package includes the real native settings and transfer GUI. It does not contain or automatically acquire the official runtime.
+Start with the [release installation guide](docs/RELEASE-INSTALL.md). It covers environment checks, verified downloads, installation, activation and recovery. If an AI agent is doing the installation, give it this repository URL and ask it to follow [AGENTS.md](AGENTS.md) and [the installation checklist](docs/INSTALL.md).
 
-## Source package installation
+- **Prebuilt Arch package:** use this fork's immutable GitHub Releases and the explicit `preview` channel. The stable channel currently has no release.
+- **Build an Arch package:** follow [the source-package guide](docs/ARCH.md). The retained upstream AUR recipe installs upstream WeTypeX, not this fork.
+- **Updates:** the package helper verifies release and asset attestations, hashes and package metadata. Installation uses an explicit pacman transaction. No pacman repository is configured, so `pacman -Syu` alone does not discover these releases.
 
-Use [Arch / Omarchy installation](docs/ARCH.md) for this fork's `PKGBUILD` exporter, package build and explicit user-service setup. The old upstream AUR recipe is not this fork's installer. Start with the read-only `python3 tools/preflight.py`. The package does not obtain official runtime, pair devices, or silently change the desktop. Clean desktop/device validation remains necessary; CI packaging alone is not end-to-end acceptance.
+The package contains the adapter and desktop applications. Obtain the official runtime separately under its applicable terms. Pairing, service activation and Fcitx restarts are separate setup steps. Existing private-prefix installations need migration review before installing a system package.
 
-## Building and Offline Tests
+## What it does
 
-The project retains the upstream CMake structure. Build dependencies include Fcitx5 development files, LibIME, Qt with WebEngine, Clang/libc++, Python 3, and cryptography. HEIF/AVIF conversion also requires PyGObject, GdkPixbuf, and the appropriate image format plugins.
+### Chinese input and desktop settings
 
-A basic isolated build uses:
+Fcitx5 integration uses WeTypeX's existing macOS engine compatibility layer. Settings include fuzzy pinyin such as `z/zh`, `c/ch`, `s/sh` and `in/ing`. The settings and transfer windows use a dark, resizable native desktop interface.
+
+Clipboard synchronization and file transfer run separately from the input path. The sync service can keep working when another input method is selected. Input has been manually tested on Hyprland 0.56.2; candidate latency and responsiveness under transfer load have not been systematically measured.
+
+![Native settings window with isolated test preferences](docs/images/native-settings.png)
+
+### Text and image clipboard sync
+
+The Linux sync service shares one pairing identity with the other features. It preserves newer local copies, avoids uploading received content again, and establishes a startup baseline so old clipboard contents are not sent automatically. Image handling includes complete pipe reads, download integrity checks and retries.
+
+PNG and JPEG/JPG have been tested with real devices. HEIF/HEIC, AVIF, WebP, GIF, TIFF and BMP are also handled by the conversion layer, subject to installed decoders; some have only offline fixture coverage. Supported images are normalized to a static PNG. Conversion does not guarantee preservation of animation, multiple pages, metadata or original file bytes.
+
+On iPhone, receiving or viewing content may require opening the WeType keyboard and its clipboard panel. Visibility there does not establish availability in the iOS system clipboard. Coordinate any other cross-device clipboard tools to avoid competing writes.
+
+### File transfer
+
+Select files and a paired device in the transfer window, then follow the invitation and connection flow. The window shows task progress, results and the receive directory. Receiving consent applies to the connected session.
+
+**Direct cross-device file copy/paste is not implemented.** Copying a `.md` or `.pdf` file in a file manager does not send it to another device. File transfer uses the dedicated window; copying a path or URI never triggers an upload. Mac–iPhone file copy/paste observed during testing used Apple's continuity features.
+
+Directory sending and per-file backend cancellation are not supported. Transfers have been tested on the local network; connectivity across other network arrangements is not established.
+
+![Native transfer window with a synthetic test task](docs/images/native-transfer.png)
+
+## Tested behavior
+
+The maintenance setup used Omarchy / Hyprland with official WeType **3.0.0 (670) on Mac** and **3.5.5 on iPhone**. These are the last reported client versions.
+
+| Direction | Text clipboard | Image clipboard | Explicit file transfer |
+| --- | --- | --- | --- |
+| Linux → Mac | Manually confirmed | Manually confirmed | User-confirmed in the native GUI |
+| Mac → Linux | Pasted on Linux | Pasted on Linux | User-confirmed in the native GUI |
+| Linux → iPhone | Received in WeType | Received in WeType | User-confirmed in the native GUI |
+| iPhone → Linux | Pasted on Linux | Pasted on Linux, including JPEG and PNG | User-confirmed in the native GUI |
+
+Clipboard results come from earlier device tests. The latest round covered the native file-transfer GUI: Mac passed before the phone-specific fix, and iPhone passed after staging `95315f80a9431822461c5e2f476ade1950df65de`. That fix is included in `rc.2`. This round did not repeat the clipboard matrix or compare file hashes across devices.
+
+The `rc.2` package at `ae25324888bea252d24f6f1c4a925c32cfd46876` passed [a clean Arch build, ten test suites, and package installation, upgrade and rollback checks](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40999204724). Its public download passed release/asset attestation and integrity verification. See the [release notes](docs/releases/v0.1.0-rc.2.md) and [validation record](docs/releases/v0.1.0-rc.2-validation.json).
+
+Desktop package migration, restart, sleep/wake, network recovery and long-duration use remain acceptance work. Rejection, cancellation, timeout and large-file performance need broader device testing. No fixed latency, resource-use or zero-overhead claims are made.
+
+## Build from source
+
+Read [the contributor guide](CONTRIBUTING.md) and run `python3 tools/preflight.py` first. Dependencies include Fcitx5 and LibIME development files, Qt6 with WebEngine, Clang/libc++, CMake, Python and cryptography. Image conversion also needs the relevant GdkPixbuf/Qt plugins. The [Arch recipe](packaging/arch/PKGBUILD.in) lists the package dependencies.
+
+This build uses the same Qt6, system-libcurl and layer-shell choices as Arch CI:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local/lib/wetypex-omarchy" \
-  -DCMAKE_INSTALL_LIBDIR=lib -DFCITX_INSTALL_USE_FCITX_SYS_PATHS=OFF
+  -DCMAKE_INSTALL_LIBDIR=lib -DFCITX_INSTALL_USE_FCITX_SYS_PATHS=OFF \
+  -DWETYPE_QT_VERSION=6 -DWETYPE_LAYER_SHELL=OFF -DWETYPE_BUNDLED_CURL=OFF
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-Missing development dependencies must be supplied separately; these commands do not install system packages or activate the input method.
-
-The source export was validated using an existing, verified dependency sysroot and system libcurl. The default bundled-curl configuration shown above was not the configuration revalidated for this export. See the validation record for the tested dependency versions and build settings.
-
-Building and running the offline tests does not require an account, device pairing, or the proprietary runtime. Actual input and device interoperability require separately obtaining the runtime and using the official association workflow, subject to the applicable software terms.
-
-## Validation Status
-
-The [0.1.0-rc.2 release](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.2) at `ae25324888bea252d24f6f1c4a925c32cfd46876` passed the [exact-tag Arch build, ten test suites and package install/upgrade/rollback workflow](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40999204724). Its public download passed release/asset attestation verification and package integrity/metadata checks through the update client. See [the release validation record](docs/releases/v0.1.0-rc.2-validation.json).
-
-The user confirmed all four explicit file-transfer directions in the isolated native GUI: Linux ↔ macOS before the phone-specific fix, and Linux ↔ iPhone after staging `95315f80a9431822461c5e2f476ade1950df65de`. That fix is included in `rc.2`. These are user-reported device results, not cross-device hash comparisons or clean desktop package migration. Restart, sleep/network recovery and long-duration validation remain pending; this is a preview release. See [candidate notes](docs/releases/v0.1.0-rc.2.md) and the [earlier rc.1 record](docs/native-release-validation.json).
-
-Historical source/package evidence:
-
-A [clean Arch package build and install/remove check](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40857038300) passed for commit `b88e6e87988685ba811c9c04e8048293651e18bc`. See [Arch installation](docs/ARCH.md) for the artifact, checksums, and validation boundaries. This does not certify later commits or real desktop/device behavior.
-
-The published source snapshot has passed:
-
-- A complete local CMake build.
-- Three offline regression suites covering synchronization behavior, image integrity, format decoding, and fragmented pipe input.
-- Staged installation checks for the compatibility helpers.
-- A source and Git metadata privacy review.
-
-Earlier device testing confirmed successful text, image, and file transfers in all four Linux ↔ Apple-device directions. These are results from specific devices and software versions, not a guarantee for every environment or a fresh end-to-end retest of the exported source snapshot.
-
-The official clients used during testing were WeType 3.0.0 (670) on Mac and 3.5.5 on iPhone.
-
-Long-duration operation, sleep and wake recovery, network interruptions, transfer cancellation, and large-file performance still need broader validation. No fixed latency, resource usage, or zero-overhead claims are made.
+These commands build and test; they do not install dependencies or activate an input method. Offline tests need no account or proprietary runtime. Actual input and device tests require separately prepared runtime and pairing.
 
 ## Documentation
 
-### Native desktop applications
+| Topic | Guide |
+| --- | --- |
+| Installation and recovery | [Release packages](docs/RELEASE-INSTALL.md) · [Arch source packages](docs/ARCH.md) |
+| Desktop use | [Settings and file transfer](docs/DESKTOP.md) · [Settings inventory](docs/SETTINGS-CONTENT.md) |
+| Maintenance | [Updates and upstream review](docs/UPDATES.md) · [Versioning](docs/VERSIONING.md) · [Changelog](CHANGELOG.md) |
+| Development | [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md) |
+| Engineering history | [Changes](docs/OMARCHY-CHANGES.md) · [Operations](docs/OMARCHY-OPERATIONS.md) · [Earlier validation](docs/OMARCHY-VALIDATION.md) |
+| Provenance | [Upstream source manifest](docs/upstream-source-manifest.json) · [Archived upstream README](docs/UPSTREAM-README.md) · [Licenses](LICENSES.md) |
 
-The packaged settings and transfer windows now use the existing real backends with a dark, resizable desktop interface. See [native GUI operation and limits](docs/DESKTOP.md). The original [isolated demo](docs/DESKTOP-DEMO.md) remains available for design experiments and is not installed as the real application.
+The README, contributor guide and license guide have English and Chinese editions. Other guides currently use English or Chinese individually. Historical records apply to their recorded commits.
 
-![Native file-transfer application, synthetic test task](docs/images/native-transfer.png)
+## Credits and licensing
 
-![Native settings application, empty isolated preferences](docs/images/native-settings.png)
+The WeTypeX baseline is [`291193a26938e0e8858d72b737066f37eb7a5f94`](https://github.com/panxuc/fcitx5-wetypex/tree/291193a26938e0e8858d72b737066f37eb7a5f94). Clipboard compatibility work also derives from [VType Linux](https://github.com/zhl-HFUT/vtype-linux). Upstream attribution and notices are retained.
 
-- [Verified installation and updates](docs/RELEASE-INSTALL.md): persistent, immutable release assets with explicit pacman installation.
-- [Changelog](CHANGELOG.md).
-- [Native desktop GUI](docs/DESKTOP.md): real workflows, receive consent, task results and recovery.
-- [Settings content inventory](docs/SETTINGS-CONTENT.md): configurable options, source mappings, and the distinction between UI controls, backend support and runtime validation.
-- [Updates and upstream integration](docs/UPDATES.md): release verification, stable/preview channels and upstream review policy.
+Licenses apply by component: WeTypeX adapter code and corresponding patches use MIT; VType-derived modules retain GPLv3; added Omarchy integration and tests use GPL-3.0-only. See [LICENSES.md](LICENSES.md) for the complete mapping and original texts.
 
-The detailed engineering records below are currently in Chinese:
+WeTypeX Omarchy is an independent, unofficial project with no Tencent affiliation, endorsement or claimed authorization. Product names and trademarks identify compatibility targets. Official executables, dictionaries, models, extracted UI resources and private user data are excluded from the distribution.
 
-- [Changes and source provenance](docs/OMARCHY-CHANGES.md)
-- [Build, operation, and shutdown notes](docs/OMARCHY-OPERATIONS.md)
-- [Validation scope and outstanding checks](docs/OMARCHY-VALIDATION.md)
-- [Original upstream README](docs/UPSTREAM-README.md)
-- [Component licensing and official agreement review](LICENSES.md)
-
-Machine-readable records are also included:
-
-- [Upstream source manifest](docs/upstream-source-manifest.json)
-- [Build dependency versions and checksums](docs/build-dependencies.json)
-- [Offline regression results](docs/source-export-validation.json)
-
-## Independent Project and Rights Notice
-
-WeTypeX Omarchy is an independent, unofficial compatibility project. It is not affiliated with, endorsed by, or authorized by Tencent or its affiliates. Names and trademarks belonging to Tencent or other rights holders are used only to identify the software and services with which this project seeks compatibility.
-
-This repository distributes adaptation source code and synthetic test data; it does not distribute the official WeType engine, installation package, dictionaries, models, or extracted interface resources. Running the project requires separately obtaining the relevant official runtime. Review and comply with the applicable [official WeType agreement](https://wetype.weixin.qq.com/web/agreement) and third-party licenses before obtaining or using that software or its services.
-
-The project does not claim that its open-source licenses or free distribution grant permission to use, modify, reverse engineer, or redistribute proprietary software, or to access official services. Compatibility and service availability may change. The software is provided without warranty as described in the applicable component licenses. Nothing in this notice overrides those licenses or any rights and obligations under applicable law. See [LICENSES.md](LICENSES.md) for sources and limitations.
-
-## Upstream and Licensing
-
-This repository uses component-specific licensing; it is not exclusively MIT or a blanket relicensing of all upstream files to GPL. It retains WeTypeX's upstream attribution and license notices. Compatibility modules derived from [VType Linux](https://github.com/zhl-HFUT/vtype-linux) retain their applicable GPLv3 licensing.
-
-- WeTypeX's own adaptation code and corresponding patches: MIT; see [LICENSES/WeTypeX-MIT.txt](LICENSES/WeTypeX-MIT.txt) and [NOTICE](NOTICE).
-- VType image compatibility components and their Python adapters: GPLv3; see [compat/LICENSE](compat/LICENSE).
-- Additional Omarchy tools, integration files, and tests: GPL-3.0-only.
-- Tencent's proprietary software, resources, and services are not covered by these open-source licenses.
-
-The repository contains adaptation source code and synthetic test fixtures. It does not distribute proprietary WeType executables, dictionaries, language models, extracted interface resources, pairing identities, or private user data.
-
-WeTypeX Omarchy is an independent, unofficial project. It is not developed or endorsed by Tencent, and no Tencent authorization is claimed. Free and open-source distribution of the adaptation code does not grant rights to Tencent's proprietary software or services. The official agreement includes restrictions concerning unauthorized intellectual property use and reverse engineering.
-
-The original upstream README also contains personal-study and 24-hour deletion language alongside its MIT license notice. That wording is preserved in the archived upstream README and is not treated as a legal exemption or authorization.
-
-See [LICENSES.md](LICENSES.md) for component-specific licensing and the official software agreement review. Free distribution does not add a noncommercial restriction to the applicable MIT or GPL licenses.
+The open-source licenses cover the adaptation code, not Tencent's proprietary software or services. Review the applicable [official agreement](https://wetype.weixin.qq.com/web/agreement) before obtaining or using the runtime. Free distribution does not grant additional rights to that software. Compatibility and service availability may change; warranty terms are those of the applicable component licenses. This notice does not override those licenses or applicable law.
