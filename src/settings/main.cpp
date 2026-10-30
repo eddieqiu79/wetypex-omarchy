@@ -84,7 +84,7 @@ static void runAccount(QWidget *owner, const QStringList &arguments,
   QObject::connect(deadline, &QTimer::timeout, process,
                    [process] { process->kill(); });
   process->start();
-  deadline->start(20000);
+  deadline->start(45000);
 }
 static bool writeFile(const QString &name, const QByteArray &bytes) {
   QDir().mkpath(QFileInfo(name).absolutePath());
@@ -1407,7 +1407,11 @@ int main(int argc, char **argv) {
             writeSetting("device_phrase_sync", bool(mask & 2));
           } else {
             QMessageBox::warning(&window, "同步设置",
-                                 "服务器未确认更改，已恢复上一次确认的选项。");
+                result.value("failure_stage") == "runtime"
+                    ? "本机账户核心依赖缺失或无法加载，请检查安装；尚未向服务器提交更改。"
+                    : code != 0
+                    ? "本机账户工具执行失败或超时，无法确认服务器结果；已恢复上一次确认的选项。"
+                    : "服务器未确认更改，已恢复上一次确认的选项。");
           }
           if (ok)
             runAccount(&window, {"sync-now", "--refresh-state"},

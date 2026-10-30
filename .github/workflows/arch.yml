@@ -49,6 +49,7 @@ jobs:
           pacman -Qkk wetypex-omarchy
           sha256sum --check /tmp/user-state.sha256
           /usr/bin/fcitx5-wetypex-update --status
+          /usr/bin/fcitx5-wetypex-account network-info
           test -x /usr/bin/wetypex-omarchy-package
           test -f /usr/share/fcitx5-wetypex/compat/cloud/图片格式.py
           test -f /usr/share/licenses/fcitx5-wetypex/WeTypeX-MIT.txt

@@ -325,7 +325,9 @@ public:
       runAccount({"group-info"}, [this](const QJsonObject &result) {
         refresh_->setEnabled(!active_);
         if (!result.value("ok").toBool()) {
-          status_->setText("设备列表获取失败，请检查关联状态或网络后重试。");
+          status_->setText(result.value("failure_stage") == "runtime"
+              ? "本机账户核心依赖缺失或无法加载，请检查安装；无需重新关联设备。"
+              : "设备列表获取失败，请检查账户工具与网络后重试。");
           return;
         }
         peers_->clear();
@@ -988,19 +990,20 @@ private:
     auto *timeout = new QTimer(process);
     timeout->setSingleShot(true);
     connect(timeout, &QTimer::timeout, process, [process] { process->kill(); });
-    timeout->start(20000);
+    timeout->start(45000);
     wetype::onProcessDone(
         process, this,
         [this, process, generation,
          callback = std::move(callback)](int code, QProcess::ExitStatus) {
           accountBusy_ = false;
           accountProcess_ = nullptr;
-          const QJsonObject result =
+          QJsonObject result =
               QJsonDocument::fromJson(process->readAllStandardOutput())
                   .object();
+          if (code != 0) result["ok"] = false;
           process->deleteLater();
           if (generation == generation_)
-            callback(code == 0 ? result : QJsonObject());
+            callback(result);
           updateActions();
         });
     process->start(qEnvironmentVariable("WETYPE_ACCOUNT_TOOL",

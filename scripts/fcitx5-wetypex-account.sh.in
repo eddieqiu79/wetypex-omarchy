@@ -131,6 +131,12 @@ PY
     ;;
 esac
 
+# Diagnose loader/support failures before touching account state or the network.
+support="${WETYPE_SUPPORT_DIR:-@WETYPE_SUPPORT_DIR@}"
+if ! timeout 10 "$support/wetypex-engine-host" "$support" network-info >/dev/null 2>&1; then
+  printf '%s\n' '{"ok":false,"failure_stage":"runtime","error":"Local engine dependencies or support libraries are unavailable"}'
+  exit 78
+fi
 runtime="${WETYPE_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5-wetypex/runtime}"
 state="${WETYPE_ACCOUNT_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5-wetypex/account}"
 support="${WETYPE_SUPPORT_DIR:-@WETYPE_SUPPORT_DIR@}"
