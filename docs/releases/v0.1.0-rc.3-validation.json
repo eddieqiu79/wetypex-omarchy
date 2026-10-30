@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0-rc.3",
+  "commit": "c6b561fc30c72fd973582032362e8c897db506e0",
+  "release_url": "https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.3",
+  "prerelease": true,
+  "immutable": true,
+  "arch_workflow": "https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/41073718988",
+  "arch_workflow_result": "passed; install, upgrade from retained development baseline, rollback and removal in clean Arch",
+  "public_download": "verified release and asset attestations, hash, size and package metadata",
+  "package_sha256": "c43042f1c0db1f546a580d4d3d81d5349ad57703885fd0af3a207a2ff664d89f",
+  "package_size": 1850126,
+  "preview_discovery": "v0.1.0-rc.3",
+  "stable_discovery": "no-release",
+  "desktop_package_installation": "not performed",
+  "device_acceptance": "historical device tests; full rc.3 package matrix not repeated"
+}

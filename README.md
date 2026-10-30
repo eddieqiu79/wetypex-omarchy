@@ -50,6 +50,8 @@ Directory sending and per-file backend cancellation are not supported. Transfers
 
 ## Tested behavior
 
+The [rc.3 release record](docs/releases/v0.1.0-rc.3-validation.json) documents the exact-tag Arch build and verified public download. Device results below were obtained on earlier builds.
+
 The maintenance setup used Omarchy / Hyprland with official WeType **3.0.0 (670) on Mac** and **3.5.5 on iPhone**. These are the last reported client versions.
 
 | Direction | Text clipboard | Image clipboard | Explicit file transfer |
