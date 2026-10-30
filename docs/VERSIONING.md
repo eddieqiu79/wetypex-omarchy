@@ -2,7 +2,7 @@
 
 The project uses distinct identifiers for separate purposes:
 
-- **Project version:** the root `VERSION` file, currently `0.1.0-dev`. It identifies this fork's adaptation and integration work. The `-dev` suffix explicitly marks a development preview, not a stable release.
+- **Project version:** the root `VERSION` file, currently `0.1.0-rc.2`. It identifies this fork's adaptation and integration work. The `-rc.2` suffix marks the second release candidate, not a stable release.
 - **Source commit:** the exact Git SHA used to build the package. This is required when reporting a development-build problem.
 - **Official runtime version:** currently `2.2.3.657`, pinned independently by the upstream compatibility/setup code. It is not this fork's version and does not indicate the installed Mac/iPhone client version.
 - **Arch package version:** development exports use `0.1.0dev.r<commit-count>.g<short-SHA>`, plus `pkgrel`. Arch `epoch=1` ensures these packages supersede the earlier previews numbered after the engine. The epoch must be retained in subsequent package metadata. makepkg may include the epoch and a colon in the package filename. CI replaces the colon with an underscore only in the uploaded artifact filename because GitHub artifacts reject colons; the package metadata and pacman version remain unchanged.

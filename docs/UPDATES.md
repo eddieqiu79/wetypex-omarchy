@@ -2,7 +2,7 @@
 
 ## Current distribution policy
 
-Use **immutable GitHub Releases from `eddieqiu79/wetypex-omarchy`**, containing reviewed Arch adapter packages. The first native-desktop release is `0.1.0-rc.1`, a preview candidate. Stable remains separate and excludes candidates. Publishing a package does not establish a stable desktop/device acceptance result.
+Use **immutable GitHub Releases from `eddieqiu79/wetypex-omarchy`**, containing reviewed Arch adapter packages. The current native-desktop release candidate is `0.1.0-rc.2`; it includes the phone-handshake and local-runtime diagnostics fixes added after `0.1.0-rc.1`. Stable remains separate and excludes candidates. Publishing a package does not establish a stable desktop/device acceptance result.
 
 See [Release installation](RELEASE-INSTALL.md) for executable download/install/update commands. The installed settings GUI also checks and downloads verified packages. No root daemon, automatic runtime download, upstream binary replacement, clipboard service activation or Fcitx restart is performed by the update client. `pacman -Syu` alone does not discover this fork's releases: no pacman repository is registered.
 
@@ -55,4 +55,4 @@ This candidate introduces no user-state schema migration. Package updates preser
 
 Offline tests cover channel/version ordering, immutable manifest identity, runtime mismatch, safe redirects, sanitized network failure, release bundle provenance, attestation command ordering, tampered package rejection, partial-download cleanup, no implicit installation, and retained download directories. GUI tests use isolated state and synthetic backend events. Exact CI and release verification results belong to the tagged SHA, not an unqualified future branch head.
 
-Fresh-machine activation, real GUI input and all affected official-device directions, long-duration behavior, sleep/network recovery and an installed-desktop rollback remain separate acceptance layers. See [native desktop behavior](DESKTOP.md) and the specific [release record](releases/v0.1.0-rc.1.md).
+Fresh-machine activation, real GUI input and all affected official-device directions, long-duration behavior, sleep/network recovery and an installed-desktop rollback remain separate acceptance layers. See [native desktop behavior](DESKTOP.md) and the specific [release record](releases/v0.1.0-rc.2.md).

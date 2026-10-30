@@ -1,6 +1,6 @@
 # WeTypeX Omarchy
 
-**Project version: 0.1.0-rc.1 — release candidate, not yet stable.** This is separate from the supported official runtime version, `2.2.3.657`. See [versioning](docs/VERSIONING.md).
+**Project version: 0.1.0-rc.2 — release candidate, not yet stable.** This is separate from the supported official runtime version, `2.2.3.657`. See [versioning](docs/VERSIONING.md).
 
 A community-maintained adaptation of [WeTypeX](https://github.com/panxuc/fcitx5-wetypex) for Omarchy and Hyprland, focused on Chinese input and reliable interoperability with the official WeType clients on macOS and iOS.
 
@@ -109,7 +109,7 @@ Building and running the offline tests does not require an account, device pairi
 
 ## Validation Status
 
-The [0.1.0-rc.1 release](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.1) at `de6df4376399d02ecd6aada9afe17b76218a5b7c` passed [clean Arch install/upgrade/rollback checks](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40934628583) and the [tagged release workflow](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40935114203). Its public download passed GitHub release/asset attestation verification and package integrity/metadata checks through the new client. See [the machine-readable record](docs/native-release-validation.json). Native-GUI real-device acceptance remains pending; it is a preview release.
+The [0.1.0-rc.1 release](https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.1) at `de6df4376399d02ecd6aada9afe17b76218a5b7c` passed [clean Arch install/upgrade/rollback checks](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40934628583) and the [tagged release workflow](https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/40935114203). Its public download passed GitHub release/asset attestation verification and package integrity/metadata checks through the new client. See [the machine-readable record](docs/native-release-validation.json). This is historical package evidence, not validation of later commits. After the phone handshake fix at `95315f80a9431822461c5e2f476ade1950df65de`, the user confirmed all four explicit file-transfer directions in the isolated native GUI (Linux ↔ macOS and Linux ↔ iPhone). The `0.1.0-rc.2` candidate includes that fix. Exact package desktop migration, sleep/network recovery and long-duration validation remain pending; see [the candidate notes](docs/releases/v0.1.0-rc.2.md).
 
 Historical source/package evidence:
 

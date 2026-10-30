@@ -27,8 +27,29 @@
     "host_package_installation": "not performed; private-prefix deployment retained"
   },
   "acceptance_pending": [
-    "Exact candidate GUI official-device transfer matrix",
-    "Exact candidate desktop input/settings and package migration",
+    "Exact published package desktop input/settings and migration",
     "Restart, sleep/network recovery and long-duration use"
-  ]
+  ],
+  "post_release_validation": {
+    "date": "2026-10-29",
+    "tested_source_commit": "95315f80a9431822461c5e2f476ade1950df65de",
+    "scope": "Isolated native GUI on the maintenance Hyprland desktop; not the immutable rc.1 package",
+    "ctest_suites": 10,
+    "test_result": "passed",
+    "explicit_file_transfer": {
+      "Linux -> macOS": "user-reported pass",
+      "macOS -> Linux": "user-reported pass",
+      "Linux -> iPhone": "user-reported pass",
+      "iPhone -> Linux": "user-reported pass"
+    },
+    "sequence": "macOS passed before the phone-specific retry fix; iPhone passed after that fix",
+    "peer_versions_last_reported": {
+      "macOS_WeType": "3.0.0 (670)",
+      "iPhone_WeType": "3.5.5"
+    },
+    "hash_comparison": "not reported",
+    "live_input_method_replaced": false,
+    "clipboard_service_restarted": false,
+    "new_pairing_created": false
+  }
 }
