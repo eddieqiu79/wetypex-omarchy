@@ -8,6 +8,7 @@ import os
 import pathlib
 import re
 import select
+import signal
 import shutil
 import subprocess
 import sys
@@ -33,19 +34,61 @@ def atomic_json(path, value):
     temporary.chmod(0o600)
     temporary.replace(path)
 
+ACCOUNT_TIMEOUT = 35
+request_health = {"requests": 0, "failures": 0, "consecutive_failures": 0,
+                  "timeouts": 0, "recent_request_ms": []}
+
+def account_request(arguments):
+    process = None
+    try:
+        process = subprocess.Popen([account_tool, *arguments], stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL, text=True,
+                                   start_new_session=True)
+        try:
+            stdout, _ = process.communicate(timeout=ACCOUNT_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            # Killing only the shell leaves its engine descendants holding the
+            # shared identity lock. Cancel this request's process group instead.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate()
+            return {"ok": False}, "timeout"
+        if process.returncode:
+            return {"ok": False}, ("identity_lock_timeout" if process.returncode == 73
+                                   else "runtime_unavailable" if process.returncode == 78
+                                   else "process_failed")
+        value = json.loads(stdout)
+        if not isinstance(value, dict):
+            return {"ok": False}, "invalid_response"
+        return value, "ok" if value.get("ok") else "request_rejected"
+    except (OSError, UnicodeError, ValueError):
+        return {"ok": False}, "local_or_response_error"
+
 def call(*arguments):
+    started = time.monotonic()
+    value, outcome = account_request(arguments)
+    request_health["requests"] += 1
+    failed = outcome != "ok"
+    request_health["failures"] += int(failed)
+    request_health["timeouts"] += int(outcome == "timeout")
+    request_health["consecutive_failures"] = (request_health["consecutive_failures"] + 1
+                                               if failed else 0)
+    request_health["last_outcome"] = outcome
+    request_health["last_operation"] = arguments[0]
+    request_health["updated_at"] = int(time.time())
+    if not failed:
+        request_health["last_success_at"] = int(time.time())
+    samples = request_health["recent_request_ms"]
+    samples.append(round((time.monotonic() - started) * 1000))
+    del samples[:-60]
     try:
-        result = subprocess.run([account_tool, *arguments], capture_output=True,
-                                text=True, timeout=35)
-    except (OSError, subprocess.TimeoutExpired, UnicodeError):
-        return {"ok": False}
-    if not result.stdout:
-        return {"ok": False}
-    try:
-        value = json.loads(result.stdout)
-        return value if isinstance(value, dict) and result.returncode == 0 else {"ok": False}
-    except json.JSONDecodeError:
-        return {"ok": False}
+        # Only bounded timing/counter metadata; never arguments or responses.
+        atomic_json(state_dir / "sync-health.json", request_health)
+    except OSError:
+        pass  # Diagnostics must not interrupt synchronization.
+    return value
 
 runtime_path = state_dir / "sync-runtime.json"
 try:

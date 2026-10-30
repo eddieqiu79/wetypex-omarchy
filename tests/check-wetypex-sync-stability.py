@@ -139,3 +139,47 @@ for code, error, empty in [(1, b'Nothing is copied\n', True),
     ns['clipboard_command'] = probe
     got = ns['local_clipboard']({})
     assert got == (clip(b'', 'empty') if empty else None)
+
+# A timed-out account shell must not leave a child holding an identity lock.
+import fcntl
+import signal
+import time
+with tempfile.TemporaryDirectory(prefix='wetypex-request-deadline-') as tmp:
+    root = Path(tmp)
+    helper = root / 'account'
+    lock_path = root / 'synthetic.lock'
+    helper.write_text('#!/usr/bin/env python3\nimport os,fcntl,time\n'
+                      'if os.fork()==0:\n'
+                      f' f=open({str(lock_path)!r},"w");fcntl.flock(f,fcntl.LOCK_EX)\n'
+                      ' time.sleep(30)\n'
+                      'else: time.sleep(30)\n')
+    helper.chmod(0o700)
+    scope = dict(subprocess=subprocess, os=os, signal=signal, json=json,
+                 time=time, account_tool=str(helper), ACCOUNT_TIMEOUT=1,
+                 state_dir=root,
+                 request_health=dict(requests=0, failures=0, consecutive_failures=0,
+                                     timeouts=0, recent_request_ms=[]))
+    nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and
+             n.name in ('atomic_json', 'account_request', 'call')]
+    exec(compile(ast.Module(nodes, []), str(SOURCE), 'exec'), scope)
+    result = scope['call']('group-info')
+    assert result == {'ok': False}
+    assert lock_path.exists(), 'child did not reach lock test'
+    with lock_path.open('a') as lock_file:
+        for retry in range(50):
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                time.sleep(.02)
+        else:
+            raise AssertionError('timed-out descendant still holds lock')
+    health = json.loads((root/'sync-health.json').read_text())
+    assert health['last_outcome'] == 'timeout' and health['timeouts'] == 1
+    assert (root/'sync-health.json').stat().st_mode & 0o777 == 0o600
+    helper.write_text('#!/bin/sh\nprintf \'{"ok":true,"clipboard":"synthetic-private-sentinel"}\'\n')
+    assert scope['call']('group-info')['ok']
+    health_text = (root/'sync-health.json').read_text()
+    assert 'synthetic-private-sentinel' not in health_text
+    assert json.loads(health_text)['consecutive_failures'] == 0
+print('Account deadline releases child lock; health metadata excludes payloads')
