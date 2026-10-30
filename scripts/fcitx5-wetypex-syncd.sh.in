@@ -181,7 +181,11 @@ def local_clipboard(environment):
         # to a visible Wayland window. Skip this poll and keep input focus.
         return _local_clipboard_silently(environment)
     if wl_paste:
-        advertised = clipboard_command([wl_paste, "--list-types"], environment)
+        probe_environment = dict(environment, LC_ALL="C")
+        advertised = clipboard_command([wl_paste, "--list-types"], probe_environment)
+        if (advertised is not None and advertised.returncode == 1 and
+                not advertised.stdout and advertised.stderr.strip() == b"Nothing is copied"):
+            return "empty", b"", hashlib.sha256(b"").hexdigest()
         if not advertised or advertised.returncode != 0:
             return None
         types = (advertised.stdout.decode("utf-8", "replace").splitlines()

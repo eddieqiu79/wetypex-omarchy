@@ -125,3 +125,17 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# Empty Wayland selection is readable state, not a connection failure.
+local_fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'local_clipboard')
+ns = {'surface_required': lambda env: False, 'wl_paste': 'wl-paste', 'hashlib': hashlib}
+exec(compile(ast.Module([local_fn], []), str(SOURCE), 'exec'), ns)
+for code, error, empty in [(1, b'Nothing is copied\n', True),
+                           (1, b'Failed to connect to Wayland', False),
+                           (1, b'Permission denied', False)]:
+    def probe(args, env, code=code, error=error):
+        assert env['LC_ALL'] == 'C'
+        return subprocess.CompletedProcess(args, code, b'', error)
+    ns['clipboard_command'] = probe
+    got = ns['local_clipboard']({})
+    assert got == (clip(b'', 'empty') if empty else None)
