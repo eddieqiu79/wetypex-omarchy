@@ -18,15 +18,15 @@ In **Versions and updates**, select stable or preview, then check explicitly. **
 
 Launch **WeTypeX File Transfer** or run `wetypex-files`.
 
-1. Refresh associated devices. A listed device is not necessarily online.
-2. Select local regular files, or drop them into the window. Duplicate canonical paths are collapsed; selection is limited to 100 files. Selection alone never transmits. Directory uploads are intentionally omitted from this first native workflow; choose individual files.
-3. Select a device and choose **Connect and send**, or **Connect / receive files** for a receive session. QR connection remains available. An invitation is not a completed connection.
+1. In **Send files**, select local regular files or drop them into the window. Duplicate canonical paths are collapsed; selection is limited to 100 files. Selection alone never transmits. Directory uploads are not supported; choose individual files.
+2. Choose an associated device card, then **Send to [device]**. Devices load automatically; **Refresh** retries the query. The association label does not imply the device is online. The file and device panels stack in narrow windows.
+3. For incoming invitations, use **Receive files** and choose **Accept and connect** or **Reject** on the invitation card. Receiving still works while viewing the send page; an invitation opens the receive page. Manual receive connections and phone QR connections remain under **Connection help**. An invitation is not a completed connection.
 4. After the real backend reports connection, queued outgoing files are submitted serially. The task list records each direction, progress and result. The next file waits for the previous backend completion/error.
 5. The actual receive directory is displayed with an open-folder action. A receive is shown as saved only after a successful backend completion and a local regular-file size/path check within that directory. This is not a cryptographic comparison with the sender. Outgoing completion means the sending backend reported success; confirm the file on the peer.
 
 **Receiving consent is session-wide:** once you explicitly connect, the existing backend automatically saves incoming files from that peer. It does not expose per-file invitation acceptance/rejection. This GUI does not invent those controls. Close or disconnect when finished.
 
-**Stop all tasks** disconnects the real transport. Closing a connected window asks first. A connection deadline and a two-minute no-progress transfer deadline prevent an indefinite busy state. Interrupted outgoing selections return to the pending list; reselect/reconnect explicitly. Cancellation does not imply that a peer deleted a file already received, and partial files must not be considered complete. Late account replies from an older session cannot revive a stopped session. An activity timeout is a recovery policy, not a throughput/latency promise.
+**Cancel waiting** ends an unconnected invitation; **Stop all transfers** asks before disconnecting an active transfer. **End connection** closes an idle connected session. Closing a connected window asks first. A connection deadline and a two-minute no-progress transfer deadline prevent an indefinite busy state. Interrupted or failed outgoing files return to the pending list if they remain readable; use **Retry send** explicitly. Missing/unreadable files must be selected again. Cancellation does not imply that a peer deleted a file already received, and partial files must not be considered complete. Late account replies from an older session cannot revive a stopped session. An activity timeout is a recovery policy, not a throughput/latency promise.
 
 Each user has one settings instance and one transfer instance. Reopening requests activation of the existing window; final focus/placement remains controlled by the compositor. Transfers end when the window/process ends. No separate persistent transfer daemon is introduced.
 
@@ -38,7 +38,7 @@ Direct cross-device `.md` / `.pdf` file copy-and-paste is not implemented. The f
 
 Automated tests exercise actual settings construction under empty XDG directories, absence of startup writes/engine initialization, asynchronous failure, damaged-config preservation, file selection, process-backed synthetic upload events, per-file results, verified receive size, terminal stop and retry selection. Images in this guide are synthetic previews, not evidence of real transfer.
 
-![Packaged transfer UI with synthetic task data](images/native-transfer.png)
+![Earlier packaged transfer UI with synthetic task data, before the send/receive redesign](images/native-transfer.png)
 
 ![Packaged settings UI with empty isolated configuration](images/native-settings.png)
 
@@ -46,6 +46,6 @@ Native desktop mapping was observed on the maintenance machine without replacing
 
 ## Incoming file invitations
 
-Keep the file-transfer window open to receive invitations from paired devices. The window loads the device list automatically. Accept the prompt to join the sender's session; received files are saved to the displayed receive directory. Canceling or rejecting the connection returns the window to its idle state. This does not add background reception when the window is closed.
+Keep the file-transfer window open to receive invitations from paired devices. The window loads the device list automatically. Accept the invitation card to join the sender's session; received files are saved to the displayed receive directory. Canceling or rejecting the connection returns the window to its idle state. This does not add background reception when the window is closed.
 
 See [the incoming-transfer fix record](FILE-RECEIVE-FIX.zh-CN.md) for the causes, implementation and device-test limits.

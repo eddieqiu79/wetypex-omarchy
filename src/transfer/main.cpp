@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
+#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
@@ -31,9 +32,13 @@
 #include <QQueue>
 #include <QSaveFile>
 #include <QScrollArea>
+#include <QResizeEvent>
 #include <QSet>
+#include <QSignalBlocker>
 #include <QShortcut>
 #include <QStandardPaths>
+#include <QStyle>
+#include <QTabBar>
 #include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -42,6 +47,14 @@
 #include <functional>
 
 namespace {
+QLabel *transferLabel(const QString &text, const char *name = "") {
+  auto *label = new QLabel(text);
+  label->setObjectName(QString::fromLatin1(name));
+  label->setTextFormat(Qt::PlainText);
+  label->setWordWrap(true);
+  return label;
+}
+
 QString dataRoot() {
   return qEnvironmentVariable(
       "WETYPE_DATA_ROOT",
@@ -202,82 +215,174 @@ GrpcInfo parseGrpcInfo(const QByteArray &data) {
 class TransferWindow final : public QWidget {
 public:
   TransferWindow() {
-    setWindowTitle(QStringLiteral("WeTypeX · 文件传输"));
+    setWindowTitle(QStringLiteral("WeTypeX · 隔空投送"));
     setMinimumSize(520, 360);
-    resize(900, 720);
+    resize(920, 780);
     setAcceptDrops(true);
+    setStyleSheet(R"(
+      QWidget#transferBody { background:#15171b; }
+      QFrame#transferCard { background:#1e2127; border:1px solid #373d47; border-radius:12px; }
+      QLabel#title { font-size:26px; font-weight:600; }
+      QLabel#sectionTitle,QLabel#receiveTitle { font-size:17px; font-weight:600; }
+      QLabel#hint,QLabel#summary { color:#a5adba; }
+      QLabel#dropHint { background:#191c21; border:1px dashed #46505c; border-radius:10px; padding:20px; color:#c9d0da; }
+      QPushButton { min-height:32px; border-radius:8px; padding:5px 12px; background:#292e37; border-color:#46505c; }
+      QPushButton#send,QPushButton#acceptInvite { background:#94e4bf; color:#13271e; border-color:#94e4bf; font-weight:600; }
+      QPushButton#send:disabled { background:#292e37; color:#939ba8; border-color:#46505c; }
+      QPushButton#deviceCard { text-align:left; padding:14px; min-height:54px; }
+      QPushButton#deviceCard:checked { background:#243a31; border:2px solid #83dfb5; }
+      QPushButton:focus { border:2px solid #83dfb5; }
+      QTabBar::tab { background:#292e37; color:#a5adba; padding:10px 20px; }
+      QTabBar::tab:selected { background:#1e2127; color:#94e4bf; border-bottom:2px solid #94e4bf; }
+      QListWidget#files,QTreeWidget#tasks { background:#1e2127; border:0; }
+      QListWidget#files::item { padding:9px 4px; }
+      QProgressBar { background:#373d47; color:#edf0f5; min-height:18px; border:0; border-radius:5px; }
+      QProgressBar::chunk { background:#327e5f; border-radius:5px; }
+    )");
     auto *outer = new QVBoxLayout(this);
     outer->setContentsMargins(0, 0, 0, 0);
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto *body = new QWidget;
-    body->setMinimumSize(650, 600);
+    body->setObjectName("transferBody");
     scroll->setWidget(body);
     outer->addWidget(scroll);
     auto *layout = new QVBoxLayout(body);
     layout->setContentsMargins(24, 20, 24, 20);
     layout->setSpacing(14);
-    title_ = new QLabel("文件传输");
-    title_->setObjectName("title");
-    layout->addWidget(title_);
-    auto *hint = new QLabel("保持此窗口打开即可收到关联设备的文件邀请。也可选择设备"
-                            "和文件主动连接；连接期间收到的文件将保存到接收目录。");
-    hint->setWordWrap(true);
-    hint->setObjectName("hint");
-    layout->addWidget(hint);
-    auto *devices = new QHBoxLayout;
-    peers_ = new QComboBox;
-    peers_->setObjectName("peers");
-    peers_->setMinimumWidth(220);
-    peers_->addItem("请刷新关联设备", QString());
-    refresh_ = new QPushButton("刷新设备");
-    refresh_->setObjectName("refresh");
-    auto *settings = new QPushButton("设置 / 关联设备");
-    devices->addWidget(peers_, 1);
-    devices->addWidget(refresh_);
-    devices->addWidget(settings);
-    layout->addLayout(devices);
-    files_ = new QListWidget;
-    files_->setObjectName("files");
-    files_->setMinimumHeight(100);
-    files_->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    layout->addWidget(
-        new QLabel("待发送文件 · 支持拖放，选择文件不会立即发送"));
-    layout->addWidget(files_, 1);
-    auto *selection = new QHBoxLayout;
+    auto *heading = new QHBoxLayout;
+    title_ = transferLabel("隔空投送", "title");
+    heading->addWidget(title_, 1);
+    auto *help = new QPushButton("连接帮助");
+    help->setObjectName("help");
+    help->setCheckable(true);
+    heading->addWidget(help);
+    layout->addLayout(heading);
+    layout->addWidget(transferLabel("选好文件，发送到你的另一台设备。", "hint"));
+    tabs_ = new QTabBar;
+    tabs_->setObjectName("transferTabs");
+    tabs_->addTab("发送文件");
+    tabs_->addTab("接收文件");
+    tabs_->setExpanding(false);
+    tabs_->setDrawBase(false);
+    layout->addWidget(tabs_);
+    auto *sendPage = new QWidget;
+    sendPage_ = sendPage;
+    layout->addWidget(sendPage);
+    auto *sendLayout = new QVBoxLayout(sendPage);
+    sendLayout->setContentsMargins(0, 0, 0, 0);
+    sendLayout->setSpacing(18);
+    selectionLayout_ = new QBoxLayout(QBoxLayout::LeftToRight);
+    selectionLayout_->setSpacing(18);
+    sendLayout->addLayout(selectionLayout_);
+    auto card = [](QVBoxLayout *&contents) {
+      auto *frame = new QFrame;
+      frame->setObjectName("transferCard");
+      contents = new QVBoxLayout(frame);
+      contents->setContentsMargins(18, 18, 18, 18);
+      contents->setSpacing(12);
+      return frame;
+    };
+    QVBoxLayout *fileLayout;
+    selectionLayout_->addWidget(card(fileLayout), 5);
+    auto *fileHeading = new QHBoxLayout;
+    fileHeading->addWidget(transferLabel("1  选择文件", "sectionTitle"), 1);
+    fileLayout->addLayout(fileHeading);
+    auto *drop = transferLabel("把文件拖到这里\n选择文件后，点击发送才会传输。", "dropHint");
+    drop->setAlignment(Qt::AlignCenter);
+    fileLayout->addWidget(drop);
     auto *choose = new QPushButton("选择文件…");
     choose->setObjectName("choose");
+    choose->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
+    fileLayout->addWidget(choose);
+    files_ = new QListWidget;
+    files_->setObjectName("files");
+    files_->setMinimumHeight(86);
+    files_->setMaximumHeight(180);
+    files_->setWordWrap(true);
+    files_->setTextElideMode(Qt::ElideNone);
+    files_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    fileLayout->addWidget(files_, 1);
     auto *remove = new QPushButton("移除选中");
-    send_ = new QPushButton("连接并发送");
+    removeFiles_ = remove;
+    remove->setObjectName("removeFiles");
+    fileHeading->addWidget(remove);
+    fileLayout->addStretch();
+    QVBoxLayout *deviceLayout;
+    selectionLayout_->addWidget(card(deviceLayout), 4);
+    auto *deviceHeading = new QHBoxLayout;
+    deviceHeading->addWidget(transferLabel("2  发给哪台设备", "sectionTitle"), 1);
+    refresh_ = new QPushButton("刷新");
+    refresh_->setObjectName("refresh");
+    deviceHeading->addWidget(refresh_);
+    deviceLayout->addLayout(deviceHeading);
+    // Keep the existing selection model used by the invitation/connection flow.
+    // The visible cards below mirror it; no second device identity is stored.
+    peers_ = new QComboBox(this);
+    peers_->setObjectName("peers");
+    peers_->addItem("正在读取关联设备…", QString());
+    peers_->hide();
+    deviceCards_ = new QVBoxLayout;
+    deviceLayout->addLayout(deviceCards_);
+    deviceEmpty_ = transferLabel("正在读取关联设备…", "hint");
+    deviceLayout->addWidget(deviceEmpty_);
+    auto *settings = new QPushButton("关联设备");
+    settings->setObjectName("pairDevices");
+    deviceLayout->addWidget(settings);
+    deviceLayout->addWidget(transferLabel("已关联不代表当前在线。发送时会确认设备是否可连接。", "hint"));
+    deviceLayout->addStretch();
+    auto *selection = new QHBoxLayout;
+    summary_ = transferLabel("先添加要发送的文件", "summary");
+    selection->addWidget(summary_, 1);
+    send_ = new QPushButton("发送文件");
     send_->setObjectName("send");
-    selection->addWidget(choose);
-    selection->addWidget(remove);
-    selection->addStretch();
     selection->addWidget(send_);
-    layout->addLayout(selection);
-    auto *connection = new QHBoxLayout;
-    connect_ = new QPushButton("连接 / 接收文件");
-    connect_->setObjectName("connect");
-    auto *scan = new QPushButton("扫码连接");
-    scan->setObjectName("scan");
-    scan_ = scan;
-    stop_ = new QPushButton("断开并停止全部任务");
-    stop_->setEnabled(false);
+    sendLayout->addLayout(selection);
+    auto *receivePage = new QWidget;
+    receivePage_ = receivePage;
+    layout->addWidget(receivePage);
+    receivePage->hide();
+    auto *receiveLayout = new QVBoxLayout(receivePage);
+    receiveLayout->setContentsMargins(0, 0, 0, 0);
+    QVBoxLayout *receiveCard;
+    receiveLayout->addWidget(card(receiveCard));
+    receiveTitle_ = transferLabel("等待其他设备发送", "receiveTitle");
+    receiveTitle_->setAlignment(Qt::AlignCenter);
+    receiveCard->addSpacing(20);
+    receiveCard->addWidget(receiveTitle_);
+    receiveHint_ = transferLabel("在 Mac 或手机的 WeType 中选择这台 Linux。\n收到邀请后，你可以选择接受或拒绝。", "hint");
+    receiveHint_->setAlignment(Qt::AlignCenter);
+    receiveCard->addWidget(receiveHint_);
+    downloads_ = qEnvironmentVariable(
+        "WETYPE_TRANSFER_DOWNLOAD_DIR",
+        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) +
+            "/WeTypeX");
+    auto *receivePath = transferLabel("接收位置：" + QDir::toNativeSeparators(downloads_), "hint");
+    receivePath->setAlignment(Qt::AlignCenter);
+    receiveCard->addWidget(receivePath);
+    invitationActions_ = new QWidget;
+    auto *inviteButtons = new QHBoxLayout(invitationActions_);
+    inviteButtons->addStretch();
+    rejectInvite_ = new QPushButton("拒绝");
+    rejectInvite_->setObjectName("rejectInvite");
+    acceptInvite_ = new QPushButton("接受并连接");
+    acceptInvite_->setObjectName("acceptInvite");
+    inviteButtons->addWidget(rejectInvite_);
+    inviteButtons->addWidget(acceptInvite_);
+    inviteButtons->addStretch();
+    receiveCard->addWidget(invitationActions_);
+    invitationActions_->hide();
+    receiveCard->addSpacing(20);
+    auto *sessionHeading = new QHBoxLayout;
+    sessionTitle_ = transferLabel("准备就绪", "sectionTitle");
+    sessionHeading->addWidget(sessionTitle_, 1);
+    stop_ = new QPushButton("结束连接");
     stop_->setObjectName("stop");
-    connection->addWidget(connect_);
-    connection->addWidget(scan);
-    connection->addStretch();
-    connection->addWidget(stop_);
-    layout->addLayout(connection);
-    qr_ = new QLabel;
-    qr_->setAlignment(Qt::AlignCenter);
-    qr_->hide();
-    layout->addWidget(qr_);
-    status_ = new QLabel("尚未连接。设备需已关联，并能建立传输连接。");
-    status_->setObjectName("status");
-    status_->setWordWrap(true);
-    status_->setTextFormat(Qt::PlainText);
+    sessionHeading->addWidget(stop_);
+    layout->addLayout(sessionHeading);
+    status_ = transferLabel("保持窗口打开即可接收邀请；发送文件前请先选择设备。", "status");
     layout->addWidget(status_);
     progress_ = new QProgressBar;
     progress_->hide();
@@ -286,27 +391,60 @@ public:
     tasks_ = new QTreeWidget;
     tasks_->setObjectName("tasks");
     tasks_->setColumnCount(3);
-    tasks_->setHeaderLabels({"方向 / 文件", "进度", "结果"});
+    tasks_->setHeaderLabels({"本次窗口的传输", "进度", "结果"});
     tasks_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    tasks_->setMinimumHeight(150);
-    layout->addWidget(tasks_, 1);
-    downloads_ = qEnvironmentVariable(
-        "WETYPE_TRANSFER_DOWNLOAD_DIR",
-        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) +
-            "/WeTypeX");
+    tasks_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    tasks_->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    tasks_->setRootIsDecorated(false);
+    tasks_->setMinimumHeight(120);
+    tasks_->setMaximumHeight(200);
+    tasks_->hide();
+    layout->addWidget(tasks_);
+    helpPanel_ = new QWidget;
+    auto *helpLayout = new QVBoxLayout(helpPanel_);
+    helpLayout->setContentsMargins(0, 0, 0, 0);
+    helpLayout->addWidget(transferLabel("没有找到设备？\n确认设备已关联，打开对端 WeType，并检查两台设备的网络，然后刷新设备列表。", "hint"));
+    auto *connection = new QHBoxLayout;
+    connect_ = new QPushButton("向所选设备发起接收连接");
+    connect_->setObjectName("connect");
+    auto *scan = new QPushButton("手机扫码连接");
+    scan->setObjectName("scan");
+    scan_ = scan;
+    connection->addWidget(connect_);
+    connection->addWidget(scan);
+    helpLayout->addLayout(connection);
+    layout->addWidget(helpPanel_);
+    helpPanel_->hide();
+    qr_ = new QLabel;
+    qr_->setAlignment(Qt::AlignCenter);
+    qr_->hide();
+    layout->addWidget(qr_);
     auto *destination = new QHBoxLayout;
-    auto *directory = new QLabel("接收目录：" + downloads_);
-    directory->setTextFormat(Qt::PlainText);
-    directory->setWordWrap(true);
-    auto *open = new QPushButton("打开接收目录");
-    destination->addWidget(directory, 1);
+    destination->addWidget(transferLabel("窗口打开时可接收邀请\n保存到：" + QDir::toNativeSeparators(downloads_), "hint"), 1);
+    auto *open = new QPushButton("打开接收文件夹");
+    open->setObjectName("openDownloads");
     destination->addWidget(open);
     layout->addLayout(destination);
+    layout->addStretch();
+    connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
+      sendPage_->setVisible(index == 0);
+      receivePage_->setVisible(index == 1);
+    });
+    connect(help, &QPushButton::toggled, helpPanel_, &QWidget::setVisible);
+    connect(acceptInvite_, &QPushButton::clicked, this, [this] { answerInvitation(true); });
+    connect(rejectInvite_, &QPushButton::clicked, this, [this] { answerInvitation(false); });
+    connect(files_, &QListWidget::itemSelectionChanged, this, [this, remove] {
+      remove->setEnabled(!files_->selectedItems().isEmpty());
+    });
+    remove->setEnabled(false);
     connect(open, &QPushButton::clicked, this, [this] {
       if (QDir(downloads_).exists())
         QDesktopServices::openUrl(QUrl::fromLocalFile(downloads_));
-      else
+      else {
+        sessionEnded_ = true;
         status_->setText("尚无接收目录，首次连接时会创建。");
+        updateActions();
+      }
     });
     connect(settings, &QPushButton::clicked, this, [] {
       QProcess::startDetached(QStringLiteral(WETYPE_SETTINGS), {"--page", "5"});
@@ -325,6 +463,7 @@ public:
       runAccount({"group-info"}, [this](const QJsonObject &result) {
         refresh_->setEnabled(!active_);
         if (!result.value("ok").toBool()) {
+          devicesQueryFailed_ = true;
           status_->setText(result.value("failure_stage") == "runtime"
               ? "本机账户核心依赖缺失或无法加载，请检查安装；无需重新关联设备。"
               : "设备列表获取失败，请检查账户工具与网络后重试。");
@@ -347,11 +486,23 @@ public:
         queueSelection();
     });
     connect(stop_, &QPushButton::clicked, this, [this] {
-      if (QMessageBox::question(
-              this, "停止连接",
-              "停止当前连接及所有收发任务？未完成的文件不能视为完整文件。") ==
-          QMessageBox::Yes)
-        stopSession("已停止连接；未完成任务未确认成功。");
+      if (!connected_) {
+        stopSession("已取消等待，待发送文件已保留。");
+        return;
+      }
+      if (!hasPendingTasks() && outgoing_.isEmpty() && currentUpload_.isEmpty()) {
+        stopSession("连接已结束，继续等待其他设备发送。");
+        return;
+      }
+      QMessageBox prompt(QMessageBox::Question, "停止当前连接？",
+          "所有收发任务都会停止。未完成的文件需要重新传输。",
+          QMessageBox::NoButton, this);
+      auto *keep = prompt.addButton("继续传输", QMessageBox::RejectRole);
+      auto *stop = prompt.addButton("停止全部传输", QMessageBox::DestructiveRole);
+      prompt.setDefaultButton(keep);
+      prompt.exec();
+      if (prompt.clickedButton() == stop)
+        stopSession("传输已停止，未完成的文件未确认成功。");
     });
     invitations_.setInterval(3000);
     connect(&invitations_, &QTimer::timeout, this, [this] { pollInvitations(); });
@@ -397,17 +548,126 @@ public:
   }
 
 private:
+  void updateDeviceCards() {
+    QStringList signature;
+    for (int i = 0; i < peers_->count(); ++i)
+      if (!peers_->itemData(i).toString().isEmpty())
+        signature << peers_->itemText(i) << peers_->itemData(i).toString();
+    if (signature != deviceSignature_) {
+      deviceSignature_ = signature;
+      while (auto *item = deviceCards_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+      }
+      for (int i = 0; i < peers_->count(); ++i) {
+        const auto id = peers_->itemData(i).toString();
+        if (id.isEmpty())
+          continue;
+        const auto name = peers_->itemText(i);
+        auto *button = new QPushButton;
+        // QPushButton uses plain text; escape mnemonic markers, not HTML.
+        button->setText(fontMetrics().elidedText(name, Qt::ElideRight, 190).replace('&', "&&") + "\n已关联");
+        button->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        button->setObjectName("deviceCard");
+        button->setAccessibleName(name + "，已关联");
+        button->setToolTip(name + "\n发送时确认设备是否可连接");
+        button->setProperty("peerId", id);
+        button->setCheckable(true);
+        button->setIcon(QIcon::fromTheme("computer", style()->standardIcon(QStyle::SP_ComputerIcon)));
+        button->setIconSize(QSize(28, 28));
+        deviceCards_->addWidget(button);
+        connect(button, &QPushButton::clicked, this, [this, id] {
+          peers_->setCurrentIndex(peers_->findData(id));
+          updateActions();
+        });
+      }
+    }
+    for (int i = 0; i < deviceCards_->count(); ++i) {
+      auto *button = qobject_cast<QPushButton *>(deviceCards_->itemAt(i)->widget());
+      button->setChecked(button->property("peerId").toString() == peers_->currentData().toString());
+      button->setEnabled(peers_->isEnabled());
+    }
+    deviceEmpty_->setVisible(deviceSignature_.isEmpty());
+    deviceEmpty_->setText(devicesQueryFailed_ ? "暂时无法读取设备。请检查网络后刷新；无需重新关联。"
+                        : devicesLoaded_ ? "还没有关联设备。先关联 Mac 或手机，再返回这里选择。"
+                                        : "正在读取关联设备…");
+  }
+
+  void answerInvitation(bool accept) {
+    if (!invitationPrompt_)
+      return;
+    const auto invite = pendingInvitation_;
+    const auto code = invite.value("transfer_code").toString();
+    pendingInvitation_ = {};
+    invitationPrompt_ = false;
+    if (ignoredInvitations_.size() >= 64)
+      ignoredInvitations_.clear();
+    ignoredInvitations_.insert(code);
+    if (accept)
+      acceptInvitation(invite);
+    else
+      status_->setText("已拒绝邀请，继续等待其他设备发送。");
+    updateActions();
+  }
+
   void updateActions() {
     const bool idle = !active_ && !invitationPrompt_ && session_.state() == QProcess::NotRunning;
     const bool peer = !peers_->currentData().toString().isEmpty();
     peers_->setEnabled(idle);
     refresh_->setEnabled(idle && !accountBusy_);
+    refresh_->setText(idle && accountBusy_ ? "更新中…" : "刷新");
+    refresh_->setToolTip(!idle ? "当前连接结束后可以刷新设备" : "重新读取关联设备列表");
     connect_->setEnabled(idle && peer && !accountBusy_);
     scan_->setEnabled(idle && !accountBusy_);
     send_->setEnabled(files_->count() &&
                       ((idle && peer && !accountBusy_) || connected_));
-    send_->setText(connected_ ? "发送所选文件" : "连接并发送");
+    const auto peerName = peers_->currentText();
+    send_->setText(retryPending_ ? "重试发送" : peer
+        ? "发送到 " + fontMetrics().elidedText(peerName, Qt::ElideRight, 150)
+        : "发送文件");
+    send_->setToolTip(peer ? "发送到 " + peerName : "请先关联并选择设备");
+    files_->setVisible(files_->count() > 0);
+    files_->setFixedHeight(qBound(54, files_->count() * 44 + 12, 170));
+    removeFiles_->setVisible(files_->count() > 0);
     stop_->setEnabled(active_);
+    stop_->setVisible(active_);
+    stop_->setText(!connected_ ? "取消等待" : currentUpload_.isEmpty() && outgoing_.isEmpty()
+        && !hasPendingTasks() ? "结束连接" : "停止全部传输");
+    qint64 bytes = 0;
+    for (int i = 0; i < files_->count(); ++i)
+      bytes += QFileInfo(files_->item(i)->data(Qt::UserRole).toString()).size();
+    summary_->setText(files_->count()
+        ? QString("%1 个文件 · %2\n%3").arg(files_->count())
+              .arg(QLocale().formattedDataSize(bytes))
+              .arg(connected_ ? "发送到当前已连接的设备" : "对方接受后开始传输")
+        : !outgoing_.isEmpty() || !currentUpload_.isEmpty()
+              ? "文件已加入本次传输" : "先添加要发送的文件");
+    sessionTitle_->setText(invitationPrompt_ ? "收到文件邀请"
+        : active_ ? connected_ ? hasPendingTasks() ? "正在传输" : "连接已建立"
+                              : "正在建立连接"
+        : retryPending_ ? "文件已保留，可以重试" : "准备就绪");
+    sessionTitle_->setVisible(active_ || retryPending_ || tasks_->topLevelItemCount() > 0);
+    status_->setVisible(active_ || retryPending_ || devicesQueryFailed_ || sessionEnded_);
+    tasks_->setVisible(tasks_->topLevelItemCount() > 0);
+    invitationActions_->setVisible(invitationPrompt_);
+    if (invitationPrompt_) {
+      receiveTitle_->setText(pendingInvitation_.value("device_name").toString("关联设备") + " 想向你发送文件");
+      receiveHint_->setText("来自已关联的设备。接受后，本次连接收到的文件会保存到下方接收位置。");
+    } else {
+      receiveTitle_->setText(active_ ? connected_ ? "连接已建立，可接收文件" : "正在建立连接…"
+                                    : "等待其他设备发送");
+      receiveHint_->setText(active_
+          ? "请保持窗口打开。本次连接收到的文件会自动保存，结果显示在下方。"
+          : "在 Mac 或手机的 WeType 中选择这台 Linux。\n收到邀请后，你可以选择接受或拒绝。");
+    }
+    updateDeviceCards();
+  }
+
+  bool hasPendingTasks() const {
+    for (auto *row : taskRows_)
+      if (!row->data(0, Qt::UserRole).toBool())
+        return true;
+    return false;
   }
   void addFiles(const QStringList &paths) {
     QSet<QString> known;
@@ -418,9 +678,10 @@ private:
       if (!info.isFile() || !info.isReadable() ||
           known.contains(info.canonicalFilePath()) || files_->count() >= 100)
         continue;
-      auto *item = new QListWidgetItem(info.fileName() + " · " +
-                                           QString::number(info.size()) + " B",
+      auto *item = new QListWidgetItem(info.fileName() + "  ·  " +
+                                           QLocale().formattedDataSize(info.size()),
                                        files_);
+      item->setSizeHint(QSize(180, 44));
       item->setData(Qt::UserRole, info.canonicalFilePath());
       item->setToolTip(info.canonicalFilePath());
       known.insert(info.canonicalFilePath());
@@ -430,6 +691,8 @@ private:
   void updatePeerList(const QJsonObject &result) {
     if (!result.value("devices").isArray())
       return;
+    devicesQueryFailed_ = false;
+    const QSignalBlocker block(peers_);
     const auto selected = peers_->currentData().toString();
     peers_->clear();
     const auto self = wetype::jsonInteger(result.value("self_uin"));
@@ -462,6 +725,7 @@ private:
       if (active_)
         return;
       if (!result.value("ok").toBool()) {
+        devicesQueryFailed_ = true;
         if (!devicesLoaded_)
           status_->setText("设备查询失败，正在重试；请检查账户工具和网络。");
         return;
@@ -474,25 +738,10 @@ private:
         return;
       // Invitations are in-memory only; never persist codes or start a backend
       // before the user accepts. The account tool validates the paired sender.
+      pendingInvitation_ = invite;
       invitationPrompt_ = true;
+      tabs_->setCurrentIndex(1);
       updateActions();
-      auto *prompt = new QMessageBox(QMessageBox::Question, "接收文件",
-          invite.value("device_name").toString("关联设备") +
-              " 请求连接并发送文件。接受后，本次连接收到的文件将保存到：\n" + downloads_,
-          QMessageBox::Yes | QMessageBox::No, this);
-      prompt->setTextFormat(Qt::PlainText);
-      prompt->setDefaultButton(QMessageBox::No);
-      prompt->setAttribute(Qt::WA_DeleteOnClose);
-      connect(prompt, &QMessageBox::finished, this, [this, invite, code](int choice) {
-        invitationPrompt_ = false;
-        if (ignoredInvitations_.size() >= 64)
-          ignoredInvitations_.clear();
-        ignoredInvitations_.insert(code);
-        if (choice == QMessageBox::Yes)
-          acceptInvitation(invite);
-        updateActions();
-      });
-      prompt->open();
     });
   }
   void acceptInvitation(const QJsonObject &invite) {
@@ -504,6 +753,8 @@ private:
     active_ = true;
     connected_ = false;
     incoming_ = true;
+    retryPending_ = false;
+    sessionEnded_ = false;
     ++generation_;
     boundUin_ = QString::number(sender);
     int peerIndex = peers_->findData(boundUin_);
@@ -531,6 +782,8 @@ private:
     active_ = true;
     connected_ = false;
     incoming_ = false;
+    retryPending_ = false;
+    sessionEnded_ = false;
     ++generation_;
     transferCode_.clear();
     sessionOutput_.clear();
@@ -554,6 +807,7 @@ private:
     files_->clear();
   }
   void queueSelection() {
+    retryPending_ = false;
     captureSelection();
     sendNext();
     updateActions();
@@ -578,6 +832,7 @@ private:
     sendSession({{"action", "upload"}, {"path", currentUpload_}});
   }
   void stopSession(const QString &reason) {
+    sessionEnded_ = true;
     active_ = false;
     connected_ = false;
     ++generation_;
@@ -588,6 +843,7 @@ private:
     if (!currentUpload_.isEmpty())
       retry.prepend(currentUpload_);
     addFiles(retry);
+    retryPending_ = files_->count() > 0;
     outgoing_.clear();
     currentUpload_.clear();
     transferCode_.clear();
@@ -666,7 +922,16 @@ private:
                          !root.isEmpty() && info.isFile() &&
                          info.size() == expected &&
                          info.canonicalFilePath().startsWith(root + '/');
-      row->setText(2, !success ? "失败，可重新选择文件重试"
+      bool retained = false;
+      if (!success && upload) {
+        addFiles({path});
+        for (int i = 0; i < files_->count(); ++i)
+          retained |= files_->item(i)->data(Qt::UserRole).toString() == info.canonicalFilePath();
+        retryPending_ |= retained;
+      }
+      row->setText(2, !success ? upload ? retained ? "失败，文件已保留可重试"
+                                                 : "失败，请重新选择可读取的文件"
+                                      : "接收失败，请让对方重新发送"
                       : upload ? "发送端报告完成"
                       : saved  ? "已落盘（大小已核对）"
                                : "对端报告完成，落盘未核实");
@@ -674,9 +939,16 @@ private:
         row->setToolTip(2, info.canonicalFilePath());
       row->setData(0, Qt::UserRole, true);
     }
+    updateActions();
   }
 
 protected:
+  void resizeEvent(QResizeEvent *event) override {
+    QWidget::resizeEvent(event);
+    selectionLayout_->setDirection(width() < 760 ? QBoxLayout::TopToBottom
+                                                 : QBoxLayout::LeftToRight);
+  }
+
   void closeEvent(QCloseEvent *event) override {
     if (active_ &&
         QMessageBox::question(this, "关闭传输",
@@ -698,6 +970,7 @@ protected:
       if (url.isLocalFile())
         paths << url.toLocalFile();
     addFiles(paths);
+    tabs_->setCurrentIndex(0);
     event->acceptProposedAction();
   }
 
@@ -899,13 +1172,19 @@ private:
                              : QStringLiteral("正在接收文件…"));
       } else if (type.endsWith(QStringLiteral("_done")) ||
                  type == "read_error") {
-        status_->setText("任务结果已更新，请查看下方列表。");
+        status_->setText(event.value("status").toInt(-1) != 0 || type == "read_error"
+            ? type == "upload_done" || type == "read_error"
+                ? "发送失败。可重试待发送列表中的文件；无法读取的文件请重新选择。"
+                : "接收失败，请让对方重新发送。"
+            : type == "upload_done" ? "发送端已完成，请在对端查看文件。"
+                : "接收任务已结束，文件是否成功保存请查看下方结果。");
         progress_->hide();
         if ((type == "upload_done" || type == "read_error") &&
             event.value("path").toString() == currentUpload_) {
           currentUpload_.clear();
           sendNext();
         }
+        updateActions();
       } else if (type == QStringLiteral("start_failed")) {
         stopSession(QStringLiteral("无法建立安全传输连接，请检查网络后重试。"));
       }
@@ -1009,8 +1288,8 @@ private:
           boundUin_.isEmpty()
               ? QStringLiteral("请使用手机扫描；二维码将在 %1 分钟后失效")
                     .arg(minutes)
-              : QStringLiteral("已发送邀请；邀请将在 %1 分钟后失效")
-                    .arg(minutes));
+              : QStringLiteral("请在 %1 上接受文件邀请；邀请将在 %2 分钟后失效。")
+                    .arg(peers_->currentText()).arg(minutes));
       deadline_.start(
           qBound(10000, result.value("expiration").toInt(180000), 300000));
       poll_.start();
@@ -1155,6 +1434,7 @@ private:
     process->start(qEnvironmentVariable("WETYPE_ACCOUNT_TOOL",
                                         QStringLiteral(WETYPE_ACCOUNT_TOOL)),
                    arguments);
+    updateActions();
   }
 
   void sendSession(const QJsonObject &command) {
@@ -1165,6 +1445,20 @@ private:
   }
 
   QComboBox *peers_ = nullptr;
+  QTabBar *tabs_ = nullptr;
+  QWidget *sendPage_ = nullptr, *receivePage_ = nullptr;
+  QPushButton *removeFiles_ = nullptr;
+  QBoxLayout *selectionLayout_ = nullptr;
+  QVBoxLayout *deviceCards_ = nullptr;
+  QStringList deviceSignature_;
+  QLabel *deviceEmpty_ = nullptr, *summary_ = nullptr,
+         *receiveTitle_ = nullptr, *receiveHint_ = nullptr, *sessionTitle_ = nullptr;
+  QWidget *helpPanel_ = nullptr, *invitationActions_ = nullptr;
+  QPushButton *acceptInvite_ = nullptr, *rejectInvite_ = nullptr;
+  QJsonObject pendingInvitation_;
+  bool retryPending_ = false;
+  bool devicesQueryFailed_ = false;
+  bool sessionEnded_ = false;
   QListWidget *files_ = nullptr;
   QTreeWidget *tasks_ = nullptr;
   QMap<QString, QTreeWidgetItem *> taskRows_;

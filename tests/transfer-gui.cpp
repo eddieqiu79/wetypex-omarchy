@@ -63,7 +63,13 @@ private slots:
     {
       TransferWindow w;
       QVERIFY(!w.active_);
-      w.acceptInvitation({{"transfer_code", "synthetic-invitation"}, {"sender_uin", 42}});
+      w.pendingInvitation_ = {{"transfer_code", "synthetic-invitation"}, {"sender_uin", 42}};
+      w.invitationPrompt_ = true;
+      w.tabs_->setCurrentIndex(1);
+      w.updateActions();
+      w.acceptInvite_->click();
+      QVERIFY(!w.invitationPrompt_);
+      QVERIFY(w.pendingInvitation_.isEmpty());
       QTRY_VERIFY(w.connected_);
       QCOMPARE(w.transferCode_, QString("synthetic-invitation"));
       QVERIFY(w.incoming_);
@@ -119,9 +125,11 @@ private slots:
       QCOMPARE(w.peers_->count(), 1);
       QVERIFY(!w.active_);
       QCOMPARE(w.session_.state(), QProcess::NotRunning);
-      auto *prompt = w.findChild<QMessageBox *>();
-      QVERIFY(prompt);
-      prompt->done(QMessageBox::No);
+      QCOMPARE(w.tabs_->currentIndex(), 1);
+      QVERIFY(!w.invitationActions_->isHidden());
+      QVERIFY(w.receiveTitle_->text().contains("Synthetic Mac"));
+      QVERIFY(w.acceptInvite_->isEnabled());
+      w.rejectInvite_->click();
       QVERIFY(!w.invitationPrompt_);
       QVERIFY(!w.active_);
       w.pollInvitations();
@@ -280,6 +288,9 @@ private slots:
     QTRY_VERIFY(w.currentUpload_.isEmpty());
     QVERIFY(w.tasks_->topLevelItem(0)->text(2).startsWith("失败"));
     QVERIFY(w.tasks_->topLevelItem(1)->text(2).contains("报告完成"));
+    QCOMPARE(w.files_->count(), 1);
+    QCOMPARE(w.files_->item(0)->data(Qt::UserRole).toString(), temp.filePath("a.md"));
+    QCOMPARE(w.send_->text(), QString("重试发送"));
     w.stopSession("test complete");
     QTRY_COMPARE(w.session_.state(), QProcess::NotRunning);
     qunsetenv("WETYPE_ENGINE_HOST");
@@ -305,14 +316,75 @@ private slots:
         *qobject_cast<QApplication *>(QCoreApplication::instance()));
     qputenv("WETYPE_TRANSFER_DOWNLOAD_DIR", "/tmp/WeTypeX-test-downloads");
     TransferWindow w;
-    w.peers_->clear();
-    w.peers_->addItem("Mac · synthetic test device", "123");
-    w.recordTask({{"event", "upload_done"},
-                  {"path", "/synthetic/example.md"},
-                  {"status", 0}});
+    w.updatePeerList({{"self_uin", 1}, {"devices", QJsonArray{
+        QJsonObject{{"uin", 123}, {"name", "MacBook"}},
+        QJsonObject{{"uin", 456}, {"name", "iPhone"}}}}});
+    QTemporaryDir files;
+    for (const auto &name : {"项目说明.pdf", "封面照片.jpg"}) {
+      QFile file(files.filePath(QString::fromUtf8(name)));
+      QVERIFY(file.open(QIODevice::WriteOnly));
+      file.resize(2400000);
+      file.close();
+      w.addFiles({file.fileName()});
+    }
     w.show();
     QTest::qWait(100);
     QVERIFY(w.grab().save(path));
+    w.resize(520, 760);
+    QTest::qWait(50);
+    QVERIFY(w.grab().save(path + ".narrow.png"));
+    w.resize(920, 780);
+    w.pendingInvitation_ = {{"transfer_code", "synthetic"}, {"sender_uin", 123}, {"device_name", "MacBook"}};
+    w.invitationPrompt_ = true;
+    w.tabs_->setCurrentIndex(1);
+    w.updateActions();
+    QTest::qWait(50);
+    QVERIFY(w.grab().save(path + ".receive.png"));
+    qunsetenv("WETYPE_TRANSFER_DOWNLOAD_DIR");
+  }
+  void deviceCardsSelectAndLockDuringConnection() {
+    TransferWindow w;
+    w.updatePeerList({{"devices", QJsonArray{
+        QJsonObject{{"uin", 42}, {"name", "Mac"}},
+        QJsonObject{{"uin", 43}, {"name", "Phone"}}}}});
+    QCOMPARE(w.deviceCards_->count(), 2);
+    auto *phone = qobject_cast<QPushButton *>(w.deviceCards_->itemAt(1)->widget());
+    QVERIFY(phone);
+    phone->click();
+    QCOMPARE(w.peers_->currentData().toString(), QString("43"));
+    QVERIFY(phone->isChecked());
+    w.active_ = true;
+    w.updateActions();
+    QVERIFY(!phone->isEnabled());
+    QVERIFY(!w.refresh_->isEnabled());
+    w.tabs_->setCurrentIndex(1);
+    QVERIFY(w.active_); // Browsing the receive page never changes the session.
+    w.stopSession("test");
+    QVERIFY(phone->isEnabled());
+  }
+  void narrowWindowStacksWithoutHorizontalScrolling() {
+    TransferWindow w;
+    w.updatePeerList({{"devices", QJsonArray{QJsonObject{{"uin", 42}, {"name", "Mac"}}}}});
+    w.resize(520, 760);
+    w.show();
+    QTest::qWait(20);
+    QCOMPARE(w.selectionLayout_->direction(), QBoxLayout::TopToBottom);
+    auto *scroll = w.findChild<QScrollArea *>();
+    QVERIFY(scroll);
+    QVERIFY(scroll->widget()->width() <= scroll->viewport()->width());
+    QVERIFY(!w.helpPanel_->isVisible());
+    w.findChild<QPushButton *>("help")->click();
+    QVERIFY(w.helpPanel_->isVisible());
+    QVERIFY(scroll->widget()->width() <= scroll->viewport()->width());
+    QVERIFY(!w.active_);
+  }
+  void unreadableUploadDoesNotClaimRetryWasRetained() {
+    QTemporaryDir temp;
+    TransferWindow w;
+    w.recordTask({{"event", "read_error"}, {"path", temp.filePath("removed.pdf")}, {"status", 1}});
+    QCOMPARE(w.files_->count(), 0);
+    QVERIFY(!w.retryPending_);
+    QVERIFY(w.tasks_->topLevelItem(0)->text(2).contains("重新选择"));
   }
 };
 QTEST_MAIN(TransferTests)
