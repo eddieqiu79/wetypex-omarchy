@@ -43,3 +43,9 @@ Automated tests exercise actual settings construction under empty XDG directorie
 ![Packaged settings UI with empty isolated configuration](images/native-settings.png)
 
 Native desktop mapping was observed on the maintenance machine without replacing the live input method. The candidate still requires real typing, settings persistence, file transfer with both official clients, disconnect/cancel, and upgrade/restart acceptance. Historical protocol success from earlier builds is recorded separately in the README.
+
+## Incoming file invitations
+
+Keep the file-transfer window open to receive invitations from paired devices. The window loads the device list automatically. Accept the prompt to join the sender's session; received files are saved to the displayed receive directory. Canceling or rejecting the connection returns the window to its idle state. This does not add background reception when the window is closed.
+
+See [the incoming-transfer fix record](FILE-RECEIVE-FIX.zh-CN.md) for the causes, implementation and device-test limits.

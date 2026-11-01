@@ -568,7 +568,8 @@ static void business_service() {
           !strcmp(getenv("WETYPE_FILE_CLIPBOARD_DIAGNOSTIC"), "1");
       // Optional read-only inspection also requests pending file invitations.
       // No current_transfer_code is supplied, so no invitation is consumed.
-      protobuf_uint(request, 3, fileDiagnostic ? 95 : 31);
+      protobuf_uint(request, 3, getenv("WETYPE_PENDING_FILE_INVITE") ? 65 :
+                                      fileDiagnostic ? 95 : 31);
       // GetGroupInfoReq.current_clipboard_version.  Both native desktop
       // clients send their last accepted version as the synchronization
       // cursor. The client still compares the response because the service
@@ -873,6 +874,7 @@ static void business_service() {
   std::string response_clipboard_binary;
   std::string response_clipboard;
   auto devices = wire::Json(json_object_new_array());
+  auto pendingInvite = wire::object();
   if (operation_subcommand == 34) {
     response_error_code =
         protobuf_uint_field(business_task_response, 2, UINT64_MAX);
@@ -885,6 +887,15 @@ static void business_service() {
       if (!hotwords.empty())
         response_hotword_version = protobuf_uint_field(hotwords.front(), 1, 0);
       diagnostic_pending_invite = !protobuf_messages_field(group, 7).empty();
+      if (getenv("WETYPE_PENDING_FILE_INVITE")) {
+        const auto invites = protobuf_messages_field(group, 7);
+        if (!invites.empty()) {
+          const auto &invite = invites.front();
+          wire::put(pendingInvite.get(), "transfer_code", protobuf_string_field(invite, 1));
+          wire::put(pendingInvite.get(), "device_name", protobuf_string_field(invite, 2));
+          wire::put(pendingInvite.get(), "sender_uin", int64_t(protobuf_uint_field(invite, 3, 0)));
+        }
+      }
       auto clips = protobuf_messages_field(group, 3);
       diagnostic_clipboard_count = clips.size();
       if (!clips.empty()) {
@@ -1055,6 +1066,8 @@ static void business_service() {
   wire::put(report.get(), "peer_dispatch_buf", response_peer_dispatch_buf);
   json_object_object_add(report.get(), "peer", response_peer.release());
   json_object_object_add(report.get(), "devices", devices.release());
+  if (getenv("WETYPE_PENDING_FILE_INVITE"))
+    json_object_object_add(report.get(), "pending_invite", pendingInvite.release());
   puts(wire::dump(report.get()).c_str());
   fflush(stdout);
   // The original report service owns delayed timers that may outlive this

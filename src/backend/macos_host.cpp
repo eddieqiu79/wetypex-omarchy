@@ -511,7 +511,7 @@ static bool run_flurry_loopback_test() {
   // the operating system owns final teardown of the two short-lived peers.
   return passed;
 }
-static int run_flurry_server() {
+static int run_flurry_server(const std::string &initialCommand = {}) {
   const char *download = getenv("WETYPE_FLURRY_DOWNLOAD_DIR");
   const char *temporary = getenv("WETYPE_FLURRY_TEMP_DIR");
   if (!download || !*download || !temporary || !*temporary) {
@@ -559,20 +559,24 @@ static int run_flurry_server() {
               "19UploadDirectoryInfoEm"));
   FlurryLiveDelegate delegate;
   alignas(16) unsigned char server[32]{};
-  constructor(server, download, temporary, &delegate, 0);
+  // We advertise capability 0x2 (range ACK support). Match that promise for
+  // direct transfers too, otherwise the peer can report failure after saving.
+  constructor(server, download, temporary, &delegate, 1);
   auto ready = wire::object();
   wire::put(ready.get(), "event", "ready");
   wire::put(ready.get(), "port", int64_t(port));
   wire::put(ready.get(), "ca_cert", flurry_ca_cert);
   wire::put(ready.get(), "server_name", flurry_server_name);
-  puts(wire::dump(ready.get()).c_str());
-  fflush(stdout);
+  if (initialCommand.empty()) {
+    puts(wire::dump(ready.get()).c_str());
+    fflush(stdout);
+  }
   if (const char *ready_path = getenv("WETYPE_FLURRY_READY_FILE")) {
     std::ofstream output(ready_path, std::ios::trunc);
     output << wire::dump(ready.get()) << '\n';
   }
-  std::string command;
-  if (!std::getline(std::cin, command))
+  std::string command = initialCommand;
+  if (command.empty() && !std::getline(std::cin, command))
     return 2;
   auto role = wire::parse(command);
   const auto action = wire::str(role.get(), "action");
@@ -601,6 +605,8 @@ static int run_flurry_server() {
     return 2;
   }
   emit_flurry_event("role_started");
+  if (!initialCommand.empty())
+    emit_flurry_grpc_ready(port);
   while (std::getline(std::cin, command)) {
     auto request = wire::parse(command);
     const auto request_action = wire::str(request.get(), "action");
@@ -720,6 +726,10 @@ static int run_flurry_wxp2p_server() {
       const auto action = wire::str(request.get(), "action");
       if (action == "quit")
         _exit(0);
+      // A paired sender can offer direct gRPC without WXP2P dispatch. Keep
+      // this process and its already-published certificate when taking that path.
+      if (action == "server")
+        return run_flurry_server(pendingCommand);
       if (action == "wxp2p_start") {
         dispatchPath = wire::str(request.get(), "dispatch_path");
         remoteCaPath = wire::str(request.get(), "remote_ca_file");

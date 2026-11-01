@@ -7,6 +7,130 @@
 class TransferTests : public QObject {
   Q_OBJECT
 private slots:
+  void deviceListLoadsFromInvitationPollAndKeepsSelection() {
+    TransferWindow w;
+    const QJsonArray devices{QJsonObject{{"uin", 1}, {"name", "Linux"}},
+                            QJsonObject{{"uin", 42}, {"name", "Synthetic Mac"}},
+                            QJsonObject{{"uin", 43}, {"name", "Synthetic Phone"}}};
+    w.updatePeerList({{"self_uin", 1}, {"devices", devices}});
+    QCOMPARE(w.peers_->count(), 2);
+    QCOMPARE(w.peers_->currentText(), QString("Synthetic Mac"));
+    QVERIFY(w.refresh_->isEnabled());
+    QVERIFY(w.connect_->isEnabled());
+    w.peers_->setCurrentIndex(1);
+    w.updatePeerList({{"self_uin", 1}, {"devices", devices}});
+    QCOMPARE(w.peers_->currentData().toString(), QString("43"));
+  }
+  void canceledPeerEndsWaitImmediately() {
+    for (int state : {1, 2, 4}) {
+      TransferWindow w;
+      w.active_ = true;
+      w.incoming_ = true;
+      w.boundUin_ = "42";
+      w.poll_.start();
+      w.handlePeer({{"ok", true}, {"dispatch_buf", "c3ludGhldGlj"},
+                    {"peer", QJsonObject{{"uin", 42}, {"state", state}}}});
+      QVERIFY(!w.active_);
+      QVERIFY(!w.poll_.isActive());
+      QVERIFY(w.refresh_->isEnabled());
+      QVERIFY(w.lastDispatch_.isEmpty());
+    }
+  }
+  void incomingInviteJoinsOriginalSession() {
+    QTemporaryDir temp;
+    const auto log = temp.filePath("commands");
+    QFile account(temp.filePath("account"));
+    QVERIFY(account.open(QIODevice::WriteOnly));
+    account.write(("#!/usr/bin/env python3\nimport sys,json\n"
+        "with open(" + QString("'%1'").arg(log) + ", 'a') as f: f.write(sys.argv[1]+'\\n')\n"
+        "print(json.dumps({'ok':True,'peer':{'uin':42,'public_cer':'c3ludGhldGlj'}}))\n").toUtf8());
+    account.close();
+    account.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    QFile backend(temp.filePath("backend"));
+    QVERIFY(backend.open(QIODevice::WriteOnly));
+    backend.write("#!/usr/bin/env python3\nimport sys,json\n"
+        "print(json.dumps({'event':'ready','transport':'wxp2p','ca_cert':'synthetic','server_name':'test'}),flush=True)\n"
+        "for line in sys.stdin:\n"
+        " c=json.loads(line)\n"
+        " if c['action']=='quit': break\n"
+        " if c['action']=='server': print(json.dumps({'event':'connected'}),flush=True)\n");
+    backend.close();
+    backend.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    qputenv("WETYPE_ACCOUNT_TOOL", account.fileName().toUtf8());
+    qputenv("WETYPE_ENGINE_HOST", backend.fileName().toUtf8());
+    qputenv("WETYPE_DATA_ROOT", temp.filePath("data").toUtf8());
+    qputenv("WETYPE_TRANSFER_DOWNLOAD_DIR", temp.filePath("downloads").toUtf8());
+    {
+      TransferWindow w;
+      QVERIFY(!w.active_);
+      w.acceptInvitation({{"transfer_code", "synthetic-invitation"}, {"sender_uin", 42}});
+      QTRY_VERIFY(w.connected_);
+      QCOMPARE(w.transferCode_, QString("synthetic-invitation"));
+      QVERIFY(w.incoming_);
+      QCOMPARE(w.peers_->currentData().toString(), QString("42"));
+      QVERIFY(w.outgoing_.isEmpty());
+      QFile commands(log);
+      QVERIFY(commands.open(QIODevice::ReadOnly));
+      QCOMPARE(commands.readAll(), QByteArray("p2p-update\n"));
+      w.stopSession("test complete");
+      QTRY_COMPARE(w.session_.state(), QProcess::NotRunning);
+    }
+    qunsetenv("WETYPE_ACCOUNT_TOOL");
+    qunsetenv("WETYPE_ENGINE_HOST");
+    qunsetenv("WETYPE_DATA_ROOT");
+    qunsetenv("WETYPE_TRANSFER_DOWNLOAD_DIR");
+  }
+  void incomingPeerMustMatchInvitation() {
+    TransferWindow w;
+    w.active_ = true;
+    w.incoming_ = true;
+    w.boundUin_ = "42";
+    w.handlePeer({{"ok", true}, {"peer", QJsonObject{}}});
+    QVERIFY(w.active_); // Wait for identity, do not consume partial response.
+    w.handlePeer({{"ok", true}, {"peer", QJsonObject{{"uin", 43}}}});
+    QVERIFY(!w.active_);
+    QVERIFY(w.status_->text().contains("身份"));
+  }
+  void lateDispatchDoesNotSwitchDirectConnection() {
+    TransferWindow w;
+    w.active_ = true;
+    w.incoming_ = true;
+    w.boundUin_ = "42";
+    w.directStarted_ = true;
+    w.handlePeer({{"ok", true}, {"dispatch_buf", "c3ludGhldGlj"},
+                  {"peer", QJsonObject{{"uin", 42}, {"public_cer", "c3ludGhldGlj"}}}});
+    QVERIFY(w.active_);
+    QVERIFY(w.lastDispatch_.isEmpty());
+    QVERIFY(!w.wxpStarted_);
+  }
+  void declinedInviteDoesNotStartBackendOrRepeatPrompt() {
+    QTemporaryDir temp;
+    QFile account(temp.filePath("account"));
+    QVERIFY(account.open(QIODevice::WriteOnly));
+    account.write("#!/usr/bin/env python3\nimport json\nprint(json.dumps({'ok':True,'self_uin':1,'devices':[{'uin':1,'name':'Linux'},{'uin':42,'name':'Synthetic Mac'}],'pending_invite':{'transfer_code':'synthetic','sender_uin':42,'device_name':'Synthetic Mac'}}))\n");
+    account.close();
+    account.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    qputenv("WETYPE_ACCOUNT_TOOL", account.fileName().toUtf8());
+    {
+      TransferWindow w;
+      w.pollInvitations();
+      QTRY_VERIFY(w.invitationPrompt_);
+      QCOMPARE(w.peers_->currentText(), QString("Synthetic Mac"));
+      QCOMPARE(w.peers_->count(), 1);
+      QVERIFY(!w.active_);
+      QCOMPARE(w.session_.state(), QProcess::NotRunning);
+      auto *prompt = w.findChild<QMessageBox *>();
+      QVERIFY(prompt);
+      prompt->done(QMessageBox::No);
+      QVERIFY(!w.invitationPrompt_);
+      QVERIFY(!w.active_);
+      w.pollInvitations();
+      QTRY_VERIFY(!w.accountBusy_);
+      QVERIFY(!w.invitationPrompt_);
+      QVERIFY(!w.active_);
+    }
+    qunsetenv("WETYPE_ACCOUNT_TOOL");
+  }
   void phoneCredentialsCanArriveAfterDispatch() {
     QTemporaryDir temp;
     qputenv("WETYPE_DATA_ROOT", temp.path().toUtf8());

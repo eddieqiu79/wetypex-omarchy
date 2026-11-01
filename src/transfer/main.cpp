@@ -221,8 +221,8 @@ public:
     title_ = new QLabel("文件传输");
     title_->setObjectName("title");
     layout->addWidget(title_);
-    auto *hint = new QLabel("选择设备和文件，再发起连接。连接期间，对端发送的文"
-                            "件将保存到接收目录。");
+    auto *hint = new QLabel("保持此窗口打开即可收到关联设备的文件邀请。也可选择设备"
+                            "和文件主动连接；连接期间收到的文件将保存到接收目录。");
     hint->setWordWrap(true);
     hint->setObjectName("hint");
     layout->addWidget(hint);
@@ -330,21 +330,10 @@ public:
               : "设备列表获取失败，请检查账户工具与网络后重试。");
           return;
         }
-        peers_->clear();
-        const auto self = wetype::jsonInteger(result.value("self_uin"));
-        for (const auto &value : result.value("devices").toArray()) {
-          const auto device = value.toObject();
-          const auto uin = wetype::jsonInteger(device.value("uin"));
-          if (uin <= 0 || uin == self)
-            continue;
-          peers_->addItem(device.value("name").toString("关联设备"),
-                          QString::number(uin));
-        }
-        if (!peers_->count()) {
-          peers_->addItem("尚无关联设备", QString());
-          status_->setText("请先在设置中关联设备，再刷新。");
-        } else
-          status_->setText("已读取关联设备；列表可见不代表对端在线。");
+        updatePeerList(result);
+        status_->setText(peers_->currentData().toString().isEmpty()
+            ? "请先在设置中关联设备，再刷新。"
+            : "已读取关联设备；列表可见不代表对端在线。");
         updateActions();
       });
     });
@@ -364,6 +353,12 @@ public:
           QMessageBox::Yes)
         stopSession("已停止连接；未完成任务未确认成功。");
     });
+    invitations_.setInterval(3000);
+    connect(&invitations_, &QTimer::timeout, this, [this] { pollInvitations(); });
+#ifndef WETYPE_GUI_TEST
+    invitations_.start();
+    QTimer::singleShot(0, this, [this] { pollInvitations(); });
+#endif
     poll_.setInterval(250);
     connect(&poll_, &QTimer::timeout, this, [this] { pollPeer(); });
     activity_.setSingleShot(true);
@@ -403,7 +398,7 @@ public:
 
 private:
   void updateActions() {
-    const bool idle = !active_ && session_.state() == QProcess::NotRunning;
+    const bool idle = !active_ && !invitationPrompt_ && session_.state() == QProcess::NotRunning;
     const bool peer = !peers_->currentData().toString().isEmpty();
     peers_->setEnabled(idle);
     refresh_->setEnabled(idle && !accountBusy_);
@@ -432,6 +427,101 @@ private:
     }
     updateActions();
   }
+  void updatePeerList(const QJsonObject &result) {
+    if (!result.value("devices").isArray())
+      return;
+    const auto selected = peers_->currentData().toString();
+    peers_->clear();
+    const auto self = wetype::jsonInteger(result.value("self_uin"));
+    for (const auto &value : result.value("devices").toArray()) {
+      const auto device = value.toObject();
+      const auto uin = wetype::jsonInteger(device.value("uin"));
+      if (uin <= 0 || uin == self)
+        continue;
+      peers_->addItem(device.value("name").toString("关联设备"), QString::number(uin));
+    }
+    if (!peers_->count())
+      peers_->addItem("尚无关联设备", QString());
+    const int index = peers_->findData(selected);
+    if (index >= 0)
+      peers_->setCurrentIndex(index);
+    if (!devicesLoaded_) {
+      devicesLoaded_ = true;
+      status_->setText(peers_->currentData().toString().isEmpty()
+          ? "尚无关联设备，请先在设置中关联。"
+          : "关联设备已加载，正在等待文件邀请。也可选择设备主动连接。");
+    }
+    updateActions();
+  }
+
+  void pollInvitations() {
+    if (active_ || accountBusy_ || invitationPrompt_ ||
+        session_.state() != QProcess::NotRunning)
+      return;
+    runAccount({"pending-file-invite"}, [this](const QJsonObject &result) {
+      if (active_)
+        return;
+      if (!result.value("ok").toBool()) {
+        if (!devicesLoaded_)
+          status_->setText("设备查询失败，正在重试；请检查账户工具和网络。");
+        return;
+      }
+      updatePeerList(result);
+      const auto invite = result.value("pending_invite").toObject();
+      const auto code = invite.value("transfer_code").toString();
+      if (code.isEmpty() || wetype::jsonInteger(invite.value("sender_uin")) <= 0 ||
+          ignoredInvitations_.contains(code))
+        return;
+      // Invitations are in-memory only; never persist codes or start a backend
+      // before the user accepts. The account tool validates the paired sender.
+      invitationPrompt_ = true;
+      updateActions();
+      auto *prompt = new QMessageBox(QMessageBox::Question, "接收文件",
+          invite.value("device_name").toString("关联设备") +
+              " 请求连接并发送文件。接受后，本次连接收到的文件将保存到：\n" + downloads_,
+          QMessageBox::Yes | QMessageBox::No, this);
+      prompt->setTextFormat(Qt::PlainText);
+      prompt->setDefaultButton(QMessageBox::No);
+      prompt->setAttribute(Qt::WA_DeleteOnClose);
+      connect(prompt, &QMessageBox::finished, this, [this, invite, code](int choice) {
+        invitationPrompt_ = false;
+        if (ignoredInvitations_.size() >= 64)
+          ignoredInvitations_.clear();
+        ignoredInvitations_.insert(code);
+        if (choice == QMessageBox::Yes)
+          acceptInvitation(invite);
+        updateActions();
+      });
+      prompt->open();
+    });
+  }
+  void acceptInvitation(const QJsonObject &invite) {
+    const auto code = invite.value("transfer_code").toString();
+    const auto sender = wetype::jsonInteger(invite.value("sender_uin"));
+    if (active_ || accountBusy_ || code.isEmpty() || sender <= 0 ||
+        session_.state() != QProcess::NotRunning)
+      return;
+    active_ = true;
+    connected_ = false;
+    incoming_ = true;
+    ++generation_;
+    boundUin_ = QString::number(sender);
+    int peerIndex = peers_->findData(boundUin_);
+    if (peerIndex < 0) {
+      peers_->addItem(invite.value("device_name").toString("关联设备"), boundUin_);
+      peerIndex = peers_->count() - 1;
+    }
+    peers_->setCurrentIndex(peerIndex);
+    transferCode_ = code;
+    sessionOutput_.clear();
+    outgoing_.clear();
+    currentUpload_.clear();
+    qr_->hide();
+    status_->setText("正在接受文件传输邀请…");
+    deadline_.start(180000);
+    updateActions();
+    startSession();
+  }
   void begin(bool qr, bool sendAfterConnect) {
     if (active_ || session_.state() != QProcess::NotRunning || accountBusy_)
       return;
@@ -440,6 +530,7 @@ private:
       return;
     active_ = true;
     connected_ = false;
+    incoming_ = false;
     ++generation_;
     transferCode_.clear();
     sessionOutput_.clear();
@@ -628,6 +719,7 @@ private:
       return;
     }
     wxpStarted_ = false;
+    directStarted_ = false;
     grpcAdvertised_ = false;
     lastDispatch_.clear();
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
@@ -844,7 +936,10 @@ private:
           boundUin_.isEmpty()
               ? QStringList{QStringLiteral("p2p-code"), path}
               : QStringList{QStringLiteral("p2p-init"), boundUin_, path};
-      requestCodeFromAccount(accountArguments);
+      if (incoming_)
+        joinInvitation(path);
+      else
+        requestCodeFromAccount(accountArguments);
       return;
     }
     const QString ip = localAddress();
@@ -873,7 +968,22 @@ private:
         boundUin_.isEmpty()
             ? QStringList{QStringLiteral("p2p-code"), path}
             : QStringList{QStringLiteral("p2p-init"), boundUin_, path};
-    requestCodeFromAccount(accountArguments);
+    if (incoming_)
+      joinInvitation(path);
+    else
+      requestCodeFromAccount(accountArguments);
+  }
+
+  void joinInvitation(const QString &path) {
+    runAccount({"p2p-update", transferCode_, path}, [this](const QJsonObject &result) {
+      if (!result.value("ok").toBool()) {
+        stopSession("无法接受邀请，邀请可能已过期；请让对端重新发送。");
+        return;
+      }
+      status_->setText("已接受邀请，正在建立连接…");
+      poll_.start();
+      handlePeer(result);
+    });
   }
 
   void requestCodeFromAccount(const QStringList &accountArguments) {
@@ -912,41 +1022,62 @@ private:
       return;
     runAccount(
         {QStringLiteral("p2p-peer"), transferCode_},
-        [this](const QJsonObject &result) {
-          const QJsonObject peer =
-              result.value(QStringLiteral("peer")).toObject();
-          if (!result.value(QStringLiteral("ok")).toBool())
-            return;
-          const QByteArray dispatch = QByteArray::fromBase64(
-              result.value(QStringLiteral("dispatch_buf"))
-                  .toString()
-                  .toLatin1());
-          if (!dispatch.isEmpty()) {
-            startWxp2p(dispatch, peer);
-            return;
-          }
-          if (!peer.value(QStringLiteral("ready")).toBool())
-            return;
-          const auto grpc = parseGrpcInfo(
-              QByteArray::fromBase64(peer.value(QStringLiteral("grpc_net_info"))
-                                         .toString()
-                                         .toLatin1()));
-          if (grpc.ca.isEmpty())
-            return;
-          poll_.stop();
-          const QString caPath =
-              dataRoot() + QStringLiteral("/state/transfer/peer-ca.pem");
-          QSaveFile ca(caPath);
-          if (!ca.open(QIODevice::WriteOnly) ||
-              ca.write(grpc.ca.toUtf8()) < 0 || !ca.commit()) {
-            status_->setText(QStringLiteral("无法保存对端安全凭据"));
-            return;
-          }
-          QFile::setPermissions(caPath, QFileDevice::ReadOwner |
-                                            QFileDevice::WriteOwner);
-          sendSession({{QStringLiteral("action"), QStringLiteral("server")},
-                       {QStringLiteral("remote_ca_file"), caPath}});
-        });
+        [this](const QJsonObject &result) { handlePeer(result); });
+  }
+
+  void handlePeer(const QJsonObject &result) {
+    const QJsonObject peer =
+        result.value(QStringLiteral("peer")).toObject();
+    if (!result.value(QStringLiteral("ok")).toBool())
+      return;
+    if (incoming_ && wetype::jsonInteger(peer.value("uin")) <= 0)
+      return; // The peer identity can arrive in a subsequent response.
+    if (incoming_ && QString::number(wetype::jsonInteger(peer.value("uin"))) != boundUin_) {
+      stopSession("对端身份与邀请不符，连接已停止。");
+      return;
+    }
+    const int peerState = peer.value("state").toInt();
+    if (peerState == 1 || peerState == 2 || peerState == 4) {
+      stopSession(peerState == 2 ? "对端已拒绝连接，请重新发起。"
+                                : "对端已取消传输，请让对端重新发送。");
+      return;
+    }
+    if (directStarted_)
+      return; // Already chose direct TLS; late dispatch must not switch roles.
+    const QByteArray dispatch = QByteArray::fromBase64(
+        result.value(QStringLiteral("dispatch_buf"))
+            .toString()
+            .toLatin1());
+    if (!dispatch.isEmpty()) {
+      startWxp2p(dispatch, peer);
+      return;
+    }
+    if (!incoming_ && !peer.value(QStringLiteral("ready")).toBool())
+      return;
+    const auto grpc = parseGrpcInfo(
+        QByteArray::fromBase64(peer.value(QStringLiteral("grpc_net_info"))
+                                   .toString()
+                                   .toLatin1()));
+    const QByteArray remoteCa = incoming_
+        ? QByteArray::fromBase64(peer.value("public_cer").toString().toLatin1(),
+                                QByteArray::AbortOnBase64DecodingErrors)
+        : grpc.ca.toUtf8();
+    if (remoteCa.isEmpty())
+      return;
+    const QString caPath =
+        dataRoot() + QStringLiteral("/state/transfer/peer-ca.pem");
+    QSaveFile ca(caPath);
+    if (!ca.open(QIODevice::WriteOnly) ||
+        ca.write(remoteCa) != remoteCa.size() || !ca.commit()) {
+      status_->setText(QStringLiteral("无法保存对端安全凭据"));
+      return;
+    }
+    QFile::setPermissions(caPath, QFileDevice::ReadOwner |
+                                      QFileDevice::WriteOwner);
+    directStarted_ = true;
+    poll_.stop();
+    sendSession({{QStringLiteral("action"), QStringLiteral("server")},
+                 {QStringLiteral("remote_ca_file"), caPath}});
   }
 
   void advertiseGrpc(const QJsonObject &identity) {
@@ -1040,7 +1171,9 @@ private:
   QPushButton *refresh_ = nullptr, *connect_ = nullptr, *scan_ = nullptr,
               *stop_ = nullptr;
   QProcess *accountProcess_ = nullptr;
-  QTimer deadline_, activity_;
+  QTimer deadline_, activity_, invitations_;
+  QSet<QString> ignoredInvitations_;
+  bool incoming_ = false, invitationPrompt_ = false, devicesLoaded_ = false;
   QQueue<QString> outgoing_;
   QString currentUpload_, downloads_;
   quint64 generation_ = 0;
@@ -1060,6 +1193,7 @@ private:
   bool accountBusy_ = false;
   bool preloadedWxp2p_ = false;
   bool wxpStarted_ = false;
+  bool directStarted_ = false;
   bool grpcAdvertised_ = false;
 };
 
