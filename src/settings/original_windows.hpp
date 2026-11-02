@@ -14,6 +14,8 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScreen>
+#include <QResizeEvent>
 #include <QStandardPaths>
 #include <QSvgRenderer>
 #include <QTabBar>
@@ -215,8 +217,15 @@ class Window final : public QWidget {
 public:
   explicit Window(QWidget *parent = nullptr) : QWidget(parent) {
     setWindowFlags(Qt::Window);
-    setMinimumSize(740, 540);
-    resize(960, 720);
+    setMinimumSize(480, 320);
+    const auto available = screen()->availableGeometry().size();
+    resize(QSize(960, 720).boundedTo(available).expandedTo(minimumSize()));
+  }
+protected:
+  void resizeEvent(QResizeEvent *event) override {
+    QWidget::resizeEvent(event);
+    if (auto *sidebar = findChild<QWidget *>("sidebar"))
+      sidebar->setFixedWidth(width() < 680 ? 168 : width() < 820 ? 180 : 211);
   }
 };
 
@@ -287,7 +296,7 @@ inline Page page(const QString &title, bool scroll = true) {
   area->setObjectName("pageScroll");
   area->setFrameShape(QFrame::NoFrame);
   area->setWidgetResizable(true);
-  area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  area->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   area->setWidget(viewport);
   layout->addWidget(area, 1);
@@ -298,8 +307,10 @@ inline QLabel *keyCap(const QString &text) {
   auto *label = new QLabel(text);
   label->setObjectName("keyCap");
   label->setAlignment(Qt::AlignCenter);
-  label->setMinimumWidth(qMax(25, text.size() * 8 + 16));
-  label->setFixedHeight(22);
+  label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+  label->ensurePolished();
+  label->setMinimumWidth(qMax(25, label->fontMetrics().horizontalAdvance(text) + 16));
+  label->setMinimumHeight(qMax(22, label->fontMetrics().height() + 4));
   static const QMap<QString, QString> icons = {
       {QStringLiteral("×"), "icon_delete_key"},
       {QStringLiteral("backslash-icon"), "icon_tips_backslash"},

@@ -8,6 +8,33 @@
 class SettingsTests : public QObject {
   Q_OBJECT
 private slots:
+  void shortcutLayoutPreservesLongContent() {
+    QWidget window;
+    QFont font = window.font();
+    font.setPointSize(18);
+    window.setFont(font);
+    auto *layout = new QVBoxLayout(&window);
+    auto *row = shortcutRow("需要完整显示的较长快捷键说明文字", false,
+                            {"Ctrl", "Shift", "PageDown"},
+                            "窄窗口下说明换行，按键仍然完整显示。");
+    layout->addWidget(row);
+    window.resize(400, 400);
+    window.show();
+    QCoreApplication::processEvents();
+    auto *box = qobject_cast<QBoxLayout *>(row->layout());
+    QVERIFY(box);
+    QCOMPARE(box->direction(), QBoxLayout::TopToBottom);
+    for (auto *key : row->findChildren<QLabel *>("keyCap")) {
+      QVERIFY(key->width() >= key->fontMetrics().horizontalAdvance(key->text()));
+      QVERIFY(row->rect().contains(QRect(key->mapTo(row, QPoint()), key->size())));
+    }
+    auto *title = row->findChild<QLabel *>("rowTitle");
+    QVERIFY(title && title->wordWrap());
+    QVERIFY(title->height() >= title->heightForWidth(title->width()));
+    window.resize(1200, 400);
+    QCoreApplication::processEvents();
+    QCOMPARE(box->direction(), QBoxLayout::LeftToRight);
+  }
   void destroyPanelWithRunningProcess_data() {
     QTest::addColumn<bool>("setup");
     QTest::newRow("update-status") << false;

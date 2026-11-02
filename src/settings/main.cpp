@@ -365,10 +365,12 @@ static QWidget *iconRow(const QString &icon, const QString &title,
   labels->addStretch();
   auto *name = new QLabel(title);
   name->setObjectName("rowTitle");
+  name->setWordWrap(true);
   labels->addWidget(name);
   if (!subtitle.isEmpty()) {
     auto *detail = new QLabel(subtitle);
     detail->setObjectName("rowSubtitle");
+    detail->setWordWrap(true);
     labels->addWidget(detail);
   }
   labels->addStretch();
@@ -569,7 +571,7 @@ protected:
 };
 static QWidget *radioRow(QRadioButton *radio, QWidget *trailing = nullptr) {
   auto *widget = new QWidget;
-  widget->setFixedHeight(46);
+  widget->setMinimumHeight(46);
   auto *layout = new QHBoxLayout(widget);
   layout->setContentsMargins(15, 0, 15, 0);
   layout->addWidget(radio);
@@ -578,36 +580,60 @@ static QWidget *radioRow(QRadioButton *radio, QWidget *trailing = nullptr) {
     layout->addWidget(trailing);
   return widget;
 }
+// Keep multi-key shortcuts readable in narrow tiled windows.
+class ShortcutRow final : public QWidget {
+protected:
+  void resizeEvent(QResizeEvent *event) override {
+    QWidget::resizeEvent(event);
+    auto *box = static_cast<QBoxLayout *>(layout());
+    // Measure the complete key group and reserve readable text space. This
+    // follows the actual font instead of assuming one screen or text size.
+    const auto margins = box->contentsMargins();
+    const int textWidth = qMax(box->itemAt(0)->minimumSize().width(),
+                              fontMetrics().averageCharWidth() * 24);
+    const int required = textWidth + box->itemAt(1)->minimumSize().width() +
+                         box->spacing() + margins.left() + margins.right();
+    box->setDirection(width() < required ? QBoxLayout::TopToBottom
+                                        : QBoxLayout::LeftToRight);
+  }
+};
 static QWidget *shortcutRow(const QString &title, bool checked,
                             const QStringList &keys,
                             const QString &subtitle = {},
                             bool implemented = false,
                             const QString &setting = {}) {
-  auto *container = new QWidget;
-  container->setFixedHeight(subtitle.isEmpty() ? 48 : 62);
+  auto *container = new ShortcutRow;
+  container->setMinimumHeight(subtitle.isEmpty() ? 48 : 62);
   auto *layout = new QHBoxLayout(container);
-  layout->setContentsMargins(15, 0, 15, 0);
+  layout->setContentsMargins(15, 8, 15, 8);
+  auto *description = new QHBoxLayout;
   auto *check = new Check;
   check->setChecked(checked);
   check->setEnabled(implemented);
   if (!implemented)
     check->setToolTip("原版快捷键尚未接入 Fcitx5，当前只读");
-  layout->addWidget(check);
+  description->addWidget(check);
   auto *labels = new QVBoxLayout;
   labels->setSpacing(1);
   labels->addStretch();
   auto *name = new QLabel(title);
   name->setObjectName("rowTitle");
+  name->setWordWrap(true);
   labels->addWidget(name);
   if (!subtitle.isEmpty()) {
     auto *detail = new QLabel(subtitle);
     detail->setObjectName("rowSubtitle");
+    detail->setWordWrap(true);
     labels->addWidget(detail);
   }
   labels->addStretch();
-  layout->addLayout(labels, 1);
+  description->addLayout(labels, 1);
+  layout->addLayout(description, 1);
+  auto *keyLayout = new QHBoxLayout;
   for (const auto &key : keys)
-    layout->addWidget(keyCap(key));
+    keyLayout->addWidget(keyCap(key));
+  keyLayout->addStretch();
+  layout->addLayout(keyLayout);
   if (implemented && !setting.isEmpty())
     QObject::connect(check, &QCheckBox::toggled,
                      [setting](bool value) { writeSetting(setting, value); });
@@ -781,6 +807,7 @@ int main(int argc, char **argv) {
                                 "shortcuts", "devices", "mobile",  "about"};
   for (int i = 0; i < navNames.size(); ++i) {
     auto *item = new QListWidgetItem(navIcon(navIcons[i]), navNames[i]);
+    item->setToolTip(navNames[i]);
     item->setSizeHint({190, 40});
     navigation->addItem(item);
   }

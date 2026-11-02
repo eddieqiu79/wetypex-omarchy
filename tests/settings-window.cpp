@@ -3,7 +3,10 @@
 #include <QApplication>
 #include <QFile>
 #include <QListWidget>
+#include <QLabel>
 #include <QStackedWidget>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QTimer>
 #include <QWidget>
 class SnapshotApplication : public QApplication {
@@ -27,6 +30,42 @@ public:
             exit(3);
             return;
           }
+          // Exercise all real pages at common tiled widths. Content wider
+          // than the viewport must remain reachable, never silently clipped.
+          for (int width : {480, 600, 720, 960, 1280}) {
+            for (int height : {320, 540}) {
+              w->resize(width, height);
+              for (int page = 0; page < nav->count(); ++page) {
+                nav->setCurrentRow(page);
+                nav->scrollToItem(nav->item(page));
+                processEvents();
+                if (w->width() != width || w->height() != height) { exit(5); return; }
+                if (!nav->viewport()->rect().contains(nav->visualItemRect(nav->item(page)).center())) {
+                  exit(9); return;
+                }
+                auto *brand = w->findChild<QLabel *>("brand");
+                if (!brand || brand->width() < brand->fontMetrics().horizontalAdvance(brand->text())) {
+                  exit(8); return;
+                }
+                for (auto *scroll : w->findChildren<QScrollArea *>("pageScroll")) {
+                  if (!scroll->isVisible()) continue;
+                  if (scroll->widget()->width() > scroll->viewport()->width() &&
+                      (scroll->horizontalScrollBarPolicy() == Qt::ScrollBarAlwaysOff ||
+                       scroll->horizontalScrollBar()->maximum() <= 0)) {
+                    exit(6); return;
+                  }
+                }
+              }
+            }
+            if (!path.isEmpty()) {
+              nav->setCurrentRow(4);
+              processEvents();
+              if (!w->grab().save(path + QString(".%1.png").arg(width))) {
+                exit(3); return;
+              }
+            }
+          }
+          w->resize(960, 720);
           nav->setCurrentRow(7);
           QTimer::singleShot(50, this, [this, w, path] {
             if (!path.isEmpty() && !w->grab().save(path + ".updates.png")) {

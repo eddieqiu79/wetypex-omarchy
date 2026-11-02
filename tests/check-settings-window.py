@@ -15,7 +15,13 @@ with tempfile.TemporaryDirectory(prefix='wetypex-gui-test-') as d:
                XDG_DATA_DIRS='/nonexistent-wetypex-data',
                DBUS_SESSION_BUS_ADDRESS='unix:path=/nonexistent-wetypex-test-bus',
                WETYPE_BACKEND_LAUNCHER='/nonexistent-synthetic-engine', WETYPE_ACCOUNT_TOOL='/nonexistent-synthetic-account')
-    subprocess.run([sys.argv[1]], env=env, check=True, timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for scale in ('1', '1.25', '1.5', '2'):
+        env['QT_SCALE_FACTOR'] = scale
+        if os.environ.get('WETYPE_TEST_GUI_SCREENSHOT'):
+            env['WETYPE_TEST_GUI_SCREENSHOT'] = os.environ['WETYPE_TEST_GUI_SCREENSHOT'] + '.scale-' + scale + '.png'
+        result = subprocess.run([sys.argv[1]], env=env, timeout=15, capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError(f'Settings window failed at scale {scale}: {result.returncode}\n{result.stderr}')
     assert not (root/'config/fcitx5/wetypex.json').exists(), 'Opening settings changed preferences'
     assert not (root/'data/fcitx5-wetypex').exists(), 'Opening settings created backend state'
-print('Actual settings window: native layout, navigation, no startup engine/account/config writes')
+print('Actual settings window: 5 widths, 2 heights at 100/125/150/200% scale, navigation, no startup engine/account/config writes')
