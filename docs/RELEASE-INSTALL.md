@@ -1,5 +1,7 @@
 # Install or update from GitHub Releases
 
+> The instructions below describe the published rc.4-era installer. The working-tree update/onboarding changes are **unreleased**; see [implementation and migration notes](UPDATE-EXPERIENCE.md), including the remaining anonymous-verification and compatible-build gates.
+
 Target: Arch/Omarchy **x86_64**. Use this fork's release packages. AUR recipes retained from original WeTypeX are not this installer. The first published version is a preview candidate; do not interpret the existence of a package as stable desktop/device acceptance.
 
 ## Prerequisites
@@ -11,11 +13,11 @@ Inspect the target host using [the installation checklist](INSTALL.md) and `pyth
 Clone and inspect the exact candidate source; record its SHA:
 
 ```sh
-git clone --branch v0.1.0-rc.3 --single-branch https://github.com/eddieqiu79/wetypex-omarchy.git
+git clone --branch v0.1.0-rc.4 --single-branch https://github.com/eddieqiu79/wetypex-omarchy.git
 cd wetypex-omarchy
 git rev-parse HEAD
 python3 tools/preflight.py
-python3 omarchy/wetypex-omarchy-package download --channel preview --tag v0.1.0-rc.3
+python3 omarchy/wetypex-omarchy-package download --channel preview --tag v0.1.0-rc.4
 ```
 
 The helper first checks immutability, verifies the release attestation, downloads and verifies the manifest, then downloads and verifies the exact package. It additionally checks SHA-256, byte count, package name, architecture, epoch and version. Failed verification never proceeds to installation. Temporary downloads are removed on normal failure; interruption/forced termination can leave a `.wetypex-download-*` directory containing partial data, which is never treated as a verified release.
@@ -23,7 +25,7 @@ The helper first checks immutability, verifies the release attestation, download
 For one explicit verified-download-and-install operation, use a **new** directory (existing verified downloads are never overwritten):
 
 ```sh
-python3 omarchy/wetypex-omarchy-package install --channel preview --tag v0.1.0-rc.3 --directory "$HOME/.cache/wetypex-omarchy/first-install" --confirm
+python3 omarchy/wetypex-omarchy-package install --channel preview --tag v0.1.0-rc.4 --directory "$HOME/.cache/wetypex-omarchy/first-install" --confirm
 ```
 
 Run as your ordinary desktop user. Only `sudo pacman -U` is elevated, and pacman still prompts interactively. Review dependency/conflict/removal proposals. No service is started and no running process is restarted. An unmanaged `~/.local/lib/fcitx5/wetypex.so` causes the helper to refuse installation until its migration is reviewed. Other unmanaged/custom prefixes still need explicit inspection; no universal migration detector is claimed.

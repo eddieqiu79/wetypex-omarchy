@@ -8,6 +8,99 @@
 class SettingsTests : public QObject {
   Q_OBJECT
 private slots:
+  void destroyPanelWithRunningProcess_data() {
+    QTest::addColumn<bool>("setup");
+    QTest::newRow("update-status") << false;
+    QTest::newRow("setup-runtime-check") << true;
+  }
+  void destroyPanelWithRunningProcess() {
+    QFETCH(bool, setup);
+    QTemporaryDir temp;
+    QFile file(temp.filePath("slow-helper"));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("#!/bin/sh\nexec /usr/bin/sleep 30\n");
+    file.close();
+    QVERIFY(file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+    QWidget *panel;
+    if (setup)
+      panel = new wetype::SetupDialog(file.fileName(), file.fileName(), [] {}, nullptr);
+    else
+      panel = new wetype::UpdatePanel(file.fileName());
+    panel->show();
+    if (setup) {
+      for (auto *button : panel->findChildren<QPushButton *>())
+        if (button->text() == "1. 检查运行资源") button->click();
+    }
+    auto *process = panel->findChild<QProcess *>();
+    QVERIFY(process);
+    QTRY_COMPARE(process->state(), QProcess::Running);
+    // Destruction, unlike an ordinary close request, must also be safe during
+    // application shutdown. QProcess's destructor emits finished synchronously.
+    QSignalSpy ended(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished));
+    delete panel;
+    QCOMPARE(ended.count(), 1);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+  }
+  void updateDownloadAndAuthorizationRecovery() {
+    QTemporaryDir temp;
+    const auto oldConfig = qgetenv("XDG_CONFIG_HOME");
+    qputenv("XDG_CONFIG_HOME", temp.path().toUtf8());
+    const auto helper = temp.filePath("helper");
+    QFile file(helper);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(R"SH(#!/bin/sh
+case "$1" in
+status) echo '{"status":"local-status","installed_version":"1:0.1.0rc4-1"}' ;;
+check) echo '{"status":"available","version":"0.2.0","tag":"v0.2.0"}' ;;
+download) echo '{"stage":"ready","tag":"v0.2.0","message":"已验证"}' ;;
+install) echo '{"stage":"failed","tag":"v0.2.0","error_code":"authorization-cancelled","retryable":true,"message":"授权取消，下载已保留"}'; exit 1 ;;
+resume) echo '{"stage":"installed","message":"已安装，待生效"}' ;;
+esac
+)SH");
+    file.close();
+    QVERIFY(file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+    wetype::UpdatePanel panel(helper);
+    panel.show();
+    auto *check = panel.findChild<QPushButton *>("checkUpdate");
+    auto *prepare = panel.findChild<QPushButton *>("prepareUpdate");
+    auto *install = panel.findChild<QPushButton *>("installUpdate");
+    auto *resume = panel.findChild<QPushButton *>("resumeUpdate");
+    auto *status = panel.findChild<QLabel *>("updateStatus");
+    QTRY_VERIFY(check->isEnabled());
+    QVERIFY(!install->isEnabled());
+    check->click();
+    QTRY_VERIFY(prepare->isEnabled());
+    QVERIFY(!install->isEnabled());
+    prepare->click();
+    QTRY_VERIFY(install->isEnabled());
+    auto confirm = [] {
+      QTimer::singleShot(0, [] {
+        for (auto *w : QApplication::topLevelWidgets())
+          if (auto *box = qobject_cast<QMessageBox *>(w)) box->button(QMessageBox::Yes)->click();
+      });
+    };
+    confirm(); install->click();
+    QTRY_VERIFY(resume->isVisible() && resume->isEnabled());
+    QVERIFY(status->text().contains("授权取消"));
+    confirm(); resume->click();
+    QTRY_VERIFY(status->text().contains("待生效"));
+    QTRY_VERIFY(check->isEnabled());
+    QVERIFY(!resume->isVisible());
+    QVERIFY(!install->isEnabled());
+    panel.close();
+    qputenv("XDG_CONFIG_HOME", oldConfig);
+  }
+  void onboardingDoesNotStartWorkOnOpen() {
+    wetype::SetupDialog dialog("/nonexistent-runtime", "/nonexistent-service", [] {}, nullptr);
+    dialog.show();
+    QCoreApplication::processEvents();
+    QVERIFY(dialog.findChildren<QProcess *>().isEmpty());
+    auto *license = dialog.findChild<QCheckBox *>();
+    QVERIFY(license && !license->isChecked());
+    for (auto *button : dialog.findChildren<QPushButton *>())
+      if (button->text().contains("从官方来源")) QVERIFY(!button->isEnabled());
+    dialog.close();
+  }
   void singleInstanceRejectsParallelWindow() {
     QTemporaryDir temp;
     const auto before = qgetenv("XDG_RUNTIME_DIR");

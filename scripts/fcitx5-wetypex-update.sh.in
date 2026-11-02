@@ -69,6 +69,13 @@ def validate_manifest(manifest, tag):
         type(package.get("size")) is not int or package["size"] <= 0 or
         package.get("pacman_version") != expected_version):
         raise ValueError("invalid package metadata")
+    compatibility = manifest.get("compatibility")
+    if compatibility is not None:
+        if not isinstance(compatibility, dict) or not isinstance(compatibility.get("dependencies"), list):
+            raise ValueError("invalid compatibility metadata")
+        if any(not isinstance(d, str) or not re.fullmatch(r"[A-Za-z0-9@_+.:<>=~-]+", d) or d.startswith("-")
+               for d in compatibility["dependencies"]):
+            raise ValueError("invalid dependency metadata")
     return package
 
 
@@ -118,6 +125,7 @@ def check_releases(channel, current, runtime, architecture):
     result = {"tag": tag, "version": manifest["version"], "commit": manifest["commit"],
               "release_url": PROJECT_REPOSITORY + "/releases/tag/" + tag,
               "package": package, "channel": manifest["channel"],
+              "compatibility": manifest.get("compatibility", {}),
               "cryptographically_verified": False,
               "next_step": "Verify release and downloaded assets with gh before any installation"}
     if manifest.get("runtime_version") != runtime:

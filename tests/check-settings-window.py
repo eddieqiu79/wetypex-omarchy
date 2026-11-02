@@ -10,7 +10,8 @@ with tempfile.TemporaryDirectory(prefix='wetypex-gui-test-') as d:
     runtime = root/'runtime'; runtime.mkdir(mode=0o700)
     env = dict(os.environ, QT_QPA_PLATFORM='offscreen', QT_QPA_PLATFORMTHEME='',
                XDG_CONFIG_HOME=str(root/'config'), XDG_DATA_HOME=str(root/'data'),
-               XDG_CACHE_HOME=str(root/'cache'), XDG_RUNTIME_DIR=str(runtime),
+               XDG_CACHE_HOME=str(root/'cache'), XDG_STATE_HOME=str(root/'state'), XDG_RUNTIME_DIR=str(runtime),
+               WETYPE_TEST_PACKAGE_TOOL=str(Path(__file__).resolve().parents[1]/'omarchy/wetypex-omarchy-package'),
                XDG_DATA_DIRS='/nonexistent-wetypex-data',
                DBUS_SESSION_BUS_ADDRESS='unix:path=/nonexistent-wetypex-test-bus',
                WETYPE_BACKEND_LAUNCHER='/nonexistent-synthetic-engine', WETYPE_ACCOUNT_TOOL='/nonexistent-synthetic-account')

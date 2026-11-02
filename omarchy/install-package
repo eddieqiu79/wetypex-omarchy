@@ -1,0 +1,125 @@
+#!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-3.0-only
+"""Fixed-purpose privileged installer. No arbitrary command, prefix or repository."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import pwd
+import runpy
+import stat
+import subprocess
+import tempfile
+import urllib.request
+
+CLIENT = '/usr/bin/wetypex-omarchy-package'
+RECEIPT_DIR = Path('/var/lib/wetypex-omarchy')
+
+
+def copy_owned_file(source, destination, uid, expected_size):
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != uid or info.st_size != expected_size:
+            raise ValueError('Invalid package file')
+        remaining = expected_size
+        with destination.open('xb') as out:
+            while remaining:
+                block = stream.read(min(1024 * 1024, remaining))
+                if not block:
+                    raise ValueError('Incomplete package')
+                out.write(block)
+                remaining -= len(block)
+            if stream.read(1):
+                raise ValueError('Package changed during copy')
+
+
+def validated_manifest(core, tag, channel):
+    p = core['policy']()
+    release = core['get_release'](p, tag, channel)
+    asset = next((a for a in release.get('assets', []) if a.get('name') == 'release-manifest.json'), {})
+    url = f'https://github.com/{core["REPO"]}/releases/download/{tag}/release-manifest.json'
+    if asset.get('browser_download_url') != url or not isinstance(asset.get('digest'), str) or not asset['digest'].startswith('sha256:'):
+        raise ValueError('Release manifest digest unavailable')
+    request = urllib.request.Request(url, headers={'User-Agent': 'wetypex-omarchy-installer'})
+    with urllib.request.build_opener(p['SafeRedirect']()).open(request, timeout=30) as response:
+        data = response.read(2 * 1024 * 1024 + 1)
+    if len(data) > 2 * 1024 * 1024 or 'sha256:' + hashlib.sha256(data).hexdigest() != asset['digest']:
+        raise ValueError('Release manifest digest mismatch')
+    manifest = json.loads(data)
+    expected = p['validate_manifest'](manifest, tag)
+    if manifest.get('runtime_version') != core['RUNTIME']:
+        raise ValueError('Runtime migration required')
+    package = next((a for a in release.get('assets', []) if a.get('name') == expected['name']), {})
+    if package.get('digest') != 'sha256:' + expected['sha256'] or package.get('size') != expected['size']:
+        raise ValueError('Published package digest mismatch')
+    return manifest, release, data
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--tag', required=True)
+    p.add_argument('--channel', choices=('stable', 'preview'), required=True)
+    p.add_argument('--package', type=Path, required=True)
+    p.add_argument('--allow-downgrade', action='store_true')
+    a = p.parse_args()
+    if os.geteuid() != 0:
+        p.error('System authorization is required')
+    uid = int(os.environ.get('PKEXEC_UID', os.environ.get('SUDO_UID', '0')))
+    if uid <= 0:
+        p.error('An ordinary desktop user must initiate the operation')
+    user = pwd.getpwuid(uid)
+    # Never use caller PATH, Python imports, TLS overrides, proxy or credentials.
+    os.environ.clear()
+    os.environ.update(PATH='/usr/bin:/bin', LANG='C.UTF-8', LC_ALL='C.UTF-8', HOME='/root')
+    os.chdir('/')
+    os.umask(0o077)
+    core = runpy.run_path(CLIENT)
+    manifest, release, manifest_bytes = validated_manifest(core, a.tag, a.channel)
+    expected = manifest['package']
+    for plugin in (Path(user.pw_dir)/'.local/lib/fcitx5/wetypex.so', Path(user.pw_dir)/'.local/lib/wetypex-omarchy/lib/fcitx5/wetypex.so'):
+        if plugin.exists():
+            raise ValueError('Private-prefix migration required')
+    with tempfile.TemporaryDirectory(prefix='wetypex-install-', dir='/var/tmp') as temporary:
+        staged = Path(temporary)/expected['name']
+        copy_owned_file(a.package, staged, uid, expected['size'])
+        # Digest verification precedes parsing any archive content. Only the
+        # protected copy is used in the transaction, never the user's cache.
+        if any(asset.get('name') == core['ReleaseVerifier'].BUNDLE for asset in release.get('assets', [])):
+            # New releases also permit independent root-side attestation checks
+            # without copying a user's credentials or trusting a local journal.
+            with core['ReleaseVerifier'](core['policy'](), release, a.tag, lambda *a, **k: None) as verifier:
+                manifest_file = Path(verifier.work.name)/'release-manifest.json'
+                manifest_file.write_bytes(manifest_bytes)
+                verifier.verify(manifest_file)
+                verifier.verify(staged)
+        info = core['verify_package'](staged, manifest)
+        core['dependencies_satisfied'](info.get('depend', []))
+        core['check_install'](expected['pacman_version'], a.allow_downgrade)
+        # Dependencies must already be installed. Invert the default yes
+        # for IgnorePkg and replacement questions (bits 1|2). Conflict
+        # removals keep their default no. Never override dependency checks.
+        result = subprocess.run(['/usr/bin/pacman', '-U', '--noconfirm', '--ask=3', '--', str(staged)],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode:
+            return 1
+        if core['installed_version']() != expected['pacman_version']:
+            return 1
+        core['private_directory'](RECEIPT_DIR)
+        os.chmod(RECEIPT_DIR, 0o755)  # Public package provenance; no user state.
+        core['atomic_json'](RECEIPT_DIR/'installed.json', {
+            'schema': 1, 'repository': core['REPO'], 'tag': a.tag,
+            'pacman_version': expected['pacman_version'], 'sha256': expected['sha256'],
+            'commit': manifest['commit'], 'origin': 'immutable-release',
+            'files': {path: core['digest'](Path(path)) for path in core['INSTALLED_FILES']}}, mode=0o644)
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main())
+    except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError):
+        # No paths, network responses, hook output or identity in diagnostics.
+        print('Verified installation did not complete; check network, dependencies and package-manager state.')
+        raise SystemExit(1)

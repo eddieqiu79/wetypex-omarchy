@@ -36,9 +36,9 @@ if(WETYPE_OMARCHY_TESTS)
     target_compile_definitions(wetypex-${gui}-tests PRIVATE ${gui_definitions})
     target_link_libraries(wetypex-${gui}-tests PRIVATE ${gui_libraries} ${WETYPE_QT_PACKAGE}::Test)
     add_test(NAME omarchy-${gui}-gui COMMAND wetypex-${gui}-tests)
-    set_tests_properties(omarchy-${gui}-gui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-wetypex-test-bus")
+    set_tests_properties(omarchy-${gui}-gui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QPA_PLATFORMTHEME=;QT_STYLE_OVERRIDE=Fusion;QT_IM_MODULE=none;DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-wetypex-test-bus")
   endforeach()
-  foreach(test update-policy release-channel package-client account-preflight file-invitations)
+  foreach(test update-policy release-channel package-client install-boundary bootstrap account-preflight file-invitations)
     add_test(NAME omarchy-${test} COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check-${test}.py)
   endforeach()
 endif()
@@ -52,3 +52,11 @@ if(WETYPE_OMARCHY_TESTS)
   add_test(NAME omarchy-settings-window COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check-settings-window.py $<TARGET_FILE:wetypex-settings-window-test>)
 endif()
 install(FILES data/wetypex-omarchy-files.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+
+# System authorization is available only in the Arch /usr package. A developer
+# prefix must never register an alternate privileged command.
+if(CMAKE_INSTALL_PREFIX STREQUAL "/usr")
+  install(PROGRAMS omarchy/install-package DESTINATION lib/wetypex-omarchy)
+  install(FILES packaging/polkit/org.wetypex.omarchy.install.policy
+    DESTINATION share/polkit-1/actions)
+endif()

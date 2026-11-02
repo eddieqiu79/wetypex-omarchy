@@ -8,10 +8,11 @@
 #include <QWidget>
 class SnapshotApplication : public QApplication {
 public:
+  static inline bool exercised = false;
   SnapshotApplication(int &argc, char **argv) : QApplication(argc, argv) {
     QTimer::singleShot(500, this, [this] {
       for (auto *w : topLevelWidgets()) {
-        if (w->windowTitle() != "WeTypeX")
+        if (w->windowTitle() != "WeTypeX" && w->windowTitle() != "WeTypeX · 开发构建")
           continue;
         w->resize(960, 720);
         auto *nav = w->findChild<QListWidget *>("navigation");
@@ -32,6 +33,7 @@ public:
               exit(4);
               return;
             }
+            exercised = true;
             exit(0);
           });
         });
@@ -41,5 +43,15 @@ public:
     });
   }
 };
+// Single-instance IPC has its own test. This harness must still open the
+// actual UI on hosts whose test sandbox cannot create Unix-domain sockets.
+#define WETYPE_SETTINGS_WINDOW_TEST
 #define QApplication SnapshotApplication
+#define main settingsSnapshotMain
 #include "../src/settings/main.cpp"
+#undef main
+#undef QApplication
+int main(int argc, char **argv) {
+  const int result = settingsSnapshotMain(argc, argv);
+  return !result && !SnapshotApplication::exercised ? 7 : result;
+}

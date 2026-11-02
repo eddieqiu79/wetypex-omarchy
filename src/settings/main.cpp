@@ -722,6 +722,9 @@ static void runLanguageDialog(QWidget *owner) {
   dialog.exec();
 }
 
+#include "update_panel.hpp"
+#include "setup_panel.hpp"
+
 int main(int argc, char **argv) {
   qunsetenv("WAYLAND_SOCKET");
   QApplication app(argc, argv);
@@ -729,8 +732,10 @@ int main(int argc, char **argv) {
   app.setDesktopFileName("fcitx5-wetypex-settings");
   app.setWindowIcon(appIcon());
   wetype::SingleInstance instance;
+#ifndef WETYPE_SETTINGS_WINDOW_TEST
   if (!instance.acquire("settings", app.arguments().contains("--activate")))
     return 0;
+#endif
   const auto args = app.arguments();
   const auto settings = readSettings();
   const auto appearance = readAppearance();
@@ -738,7 +743,11 @@ int main(int argc, char **argv) {
 
   Window window;
   window.setObjectName("windowSurface");
+#ifdef WETYPE_DEVELOPMENT_BUILD
+  window.setWindowTitle("WeTypeX · 开发构建");
+#else
   window.setWindowTitle("WeTypeX");
+#endif
   auto *root = new QHBoxLayout(&window);
   root->setContentsMargins(0, 0, 0, 0);
   root->setSpacing(0);
@@ -1534,108 +1543,28 @@ int main(int argc, char **argv) {
     QDesktopServices::openUrl(
         QUrl("https://github.com/eddieqiu79/wetypex-omarchy/issues"));
   });
-  auto *manualUpdate = toggle(false, false);
-  manualUpdate->setToolTip(
-      "尚未提供自动更新通道；不会下载原始 WeTypeX 的软件包");
-  about.body->addWidget(
-      rowsCard({row("软件更新", "目前通过已审核的 Arch 软件包手动更新",
-                    manualUpdate, 62),
-                row("我要反馈", {}, feedback, 48)}));
-  auto *releaseChannel = new QComboBox;
-  releaseChannel->addItem("稳定版", "stable");
-  releaseChannel->addItem("候选版（需实机验收）", "preview");
-  about.body->addWidget(releaseChannel);
-  auto *checkRelease = new QPushButton("检查更新");
-  auto *releaseStatus = new QLabel("只检查本项目发布版本，不自动下载安装。");
-  releaseStatus->setObjectName("rowSubtitle");
-  releaseStatus->setWordWrap(true);
-  releaseStatus->setTextFormat(Qt::PlainText);
-  about.body->addWidget(checkRelease);
-  about.body->addWidget(releaseStatus);
-  QObject::connect(checkRelease, &QPushButton::clicked, &window, [=, &window] {
-    checkRelease->setEnabled(false);
-    releaseStatus->setText("正在检查所选频道…");
-    auto *process = new QProcess(&window);
-    process->setProgram(QStringLiteral(WETYPE_UPDATE));
-    process->setArguments(
-        {"--check", "--channel", releaseChannel->currentData().toString()});
-    auto *deadline = new QTimer(process);
-    deadline->setSingleShot(true);
-    QObject::connect(deadline, &QTimer::timeout, process,
-                     [process] { process->kill(); });
-    wetype::onProcessDone(
-        process, &window, [=](int code, QProcess::ExitStatus) {
-          deadline->stop();
-          checkRelease->setEnabled(true);
-          const auto result =
-              QJsonDocument::fromJson(process->readAllStandardOutput())
-                  .object();
-          const QMap<QString, QString> messages{
-              {"no-release", "所选频道目前尚无已发布版本。"},
-              {"current", "此设置程序版本与当前稳定发布版本一致。"},
-              {"installed-newer",
-               "此设置程序比当前发布版更新，不建议自动降级。"},
-              {"runtime-review-required",
-               "新版本的引擎要求不同，需要先审核迁移步骤。"},
-              {"release-not-immutable",
-               "发布记录尚未满足不可变要求，不能作为可靠升级来源。"},
-              {"installed-version-unknown",
-               "无法识别当前版本，请核对安装来源。"},
-              {"unsupported-architecture", "此更新通道目前只支持 x86_64。"}};
-          const auto state = result.value("status").toString();
-          if (!code && state == "available")
-            releaseStatus->setText(
-                "发现新版本 " + result.value("version").toString() +
-                "。请按更新说明验证来源并升级 Arch 包；尚未安装。");
-          else
-            releaseStatus->setText(
-                !code && messages.contains(state)
-                    ? messages.value(state)
-                    : "检查失败或超时，无法判断是否有更新；请稍后重试。");
-          process->deleteLater();
-        });
-    process->start();
-    deadline->start(45000);
+  about.body->addWidget(rowsCard({row("我要反馈", {}, feedback, 48)}));
+#ifdef WETYPE_DEVELOPMENT_BUILD
+  auto *developmentNote = new QLabel("开发构建：此窗口用于本地测试。日常安装请从系统中的 WeTypeX 更新。");
+  developmentNote->setWordWrap(true);
+  about.body->addWidget(developmentNote);
+#else
+  QString packageTool = QStringLiteral(WETYPE_PACKAGE_TOOL);
+#ifdef WETYPE_SETTINGS_WINDOW_TEST
+  packageTool = qEnvironmentVariable("WETYPE_TEST_PACKAGE_TOOL", packageTool);
+#endif
+  about.body->addWidget(new wetype::UpdatePanel(packageTool, &window));
+#endif
+#ifndef WETYPE_DEVELOPMENT_BUILD
+  auto *firstSetup = new QPushButton("安装后的使用引导…");
+  QObject::connect(firstSetup, &QPushButton::clicked, &window, [&window, navigation] {
+    wetype::SetupDialog dialog(QStringLiteral(WETYPE_SETUP_TOOL),
+                              QStringLiteral(WETYPE_SERVICE_TOOL),
+                              [navigation] { navigation->setCurrentRow(5); }, &window);
+    dialog.exec();
   });
-  auto *downloadRelease = new QPushButton("下载并验证软件包…");
-  about.body->addWidget(downloadRelease);
-  QObject::connect(
-      downloadRelease, &QPushButton::clicked, &window, [=, &window] {
-        const auto dir =
-            QFileDialog::getExistingDirectory(&window, "选择软件包保存目录");
-        if (dir.isEmpty())
-          return;
-        downloadRelease->setEnabled(false);
-        releaseStatus->setText("正在下载并验证发布证明；不会安装或重启输入法…");
-        auto *process = new QProcess(&window);
-        process->setProgram(QStringLiteral(WETYPE_PACKAGE_TOOL));
-        process->setArguments({"download", "--channel",
-                               releaseChannel->currentData().toString(),
-                               "--directory", dir});
-        auto *deadline = new QTimer(process);
-        deadline->setSingleShot(true);
-        QObject::connect(deadline, &QTimer::timeout, process,
-                         [process] { process->kill(); });
-        wetype::onProcessDone(
-            process, &window, [=](int code, QProcess::ExitStatus) {
-              deadline->stop();
-              downloadRelease->setEnabled(true);
-              const auto result =
-                  QJsonDocument::fromJson(process->readAllStandardOutput())
-                      .object();
-              if (!code && result.value("status") == "verified") {
-                releaseStatus->setText("软件包已验证并下载。请按升级说明使用 "
-                                       "pacman 安装；当前程序尚未替换。");
-                QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
-              } else
-                releaseStatus->setText(
-                    "下载或验证失败。需安装 github-cli，并支持 release "
-                    "verify；请检查网络、认证和保存目录。未安装软件包。");
-              process->deleteLater();
-            });
-        process->start();
-        deadline->start(900000);
-      });
+  about.body->addWidget(firstSetup);
+#endif
   auto *updateHelp = new QPushButton("查看升级与回退说明");
   QObject::connect(updateHelp, &QPushButton::clicked, [] {
     QDesktopServices::openUrl(

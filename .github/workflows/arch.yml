@@ -8,6 +8,11 @@ on:
       source_ref:
         required: true
         type: string
+      archive_snapshot:
+        description: Reviewed Arch archive date (YYYY/MM/DD); empty only for rolling CI
+        required: false
+        type: string
+        default: ""
       artifact_name:
         required: true
         type: string
@@ -20,10 +25,19 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Prepare clean Arch build environment
+        shell: bash
+        env:
+          ARCHIVE_SNAPSHOT: ${{ inputs.archive_snapshot }}
         run: |
           # The minimal image excludes docs by default; inspect the entire installed package.
           sed -i '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
-          pacman -Syu --noconfirm git cmake clang boost fcitx5 fcitx5-qt libime libc++ json-c curl openssl bubblewrap util-linux python python-cryptography python-gobject gdk-pixbuf2 libheif libavif python-fonttools python-pillow fontconfig wayland qt6-base qt6-svg qt6-webengine qt6-imageformats wl-clipboard pipewire ffmpeg libnotify polkit
+          if [ -n "$ARCHIVE_SNAPSHOT" ]; then
+            [[ "$ARCHIVE_SNAPSHOT" =~ ^[0-9]{4}/[0-9]{2}/[0-9]{2}$ ]] || exit 1
+            printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$ARCHIVE_SNAPSHOT" > /etc/pacman.d/mirrorlist
+            # This is a disposable CI container, never the end user's system.
+            pacman -Syyuu --noconfirm
+          fi
+          pacman -Syu --noconfirm git cmake clang boost fcitx5 fcitx5-qt libime libc++ json-c curl openssl bubblewrap util-linux python python-cryptography python-gobject gdk-pixbuf2 libheif libavif python-fonttools python-pillow fontconfig wayland qt6-base qt6-svg qt6-webengine qt6-imageformats wl-clipboard pipewire ffmpeg libnotify polkit github-cli
           useradd -m builder
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -31,6 +45,8 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.source_ref || github.ref }}
       - name: Export and build as ordinary user
+        env:
+          WETYPE_BUILD_SNAPSHOT: ${{ inputs.archive_snapshot }}
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE"
           runuser -u builder -- python3 tools/build-arch.py --output /tmp/wetypex-build --build
@@ -61,6 +77,8 @@ jobs:
           QT_QPA_PLATFORM=offscreen /usr/bin/wetypex-image-helper --normalize-image < fixtures/formats/synthetic.png > /tmp/check.png
           python -c 'from pathlib import Path; assert Path("/tmp/check.png").read_bytes().startswith(b"\x89PNG")'
           pacman -Q > /tmp/wetypex-build/build-packages.txt
+          test -x /usr/lib/wetypex-omarchy/install-package
+          test -f /usr/share/polkit-1/actions/org.wetypex.omarchy.install.policy
           cd /tmp/wetypex-build
           # GitHub artifact filenames cannot contain colons; package metadata is unchanged.
           for pkg in *.pkg.tar.zst; do safe=$(printf "%s" "$pkg" | tr : _); if [ "$pkg" != "$safe" ]; then mv -- "$pkg" "$safe"; fi; done

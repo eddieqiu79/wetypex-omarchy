@@ -77,3 +77,7 @@ Include:
 Keep the description about the final patch. Link related issues and explain non-obvious tradeoffs. Untested work can still be reviewed when the missing evidence is stated clearly. Do not attach raw private logs or user files to fill that gap.
 
 For release work, follow [the publishing workflow](docs/UPDATES.md#maintainer-publishing-workflow). Published assets are immutable; changed packages need a new version. Offline or container checks alone do not qualify a candidate as a stable desktop release.
+
+## Local development and installation updates
+
+Use [the separated development/update workflow](docs/UPDATE-EXPERIENCE.md) for the changes after rc.4. Local builds default to a visible development label and disable production update controls. `tools/develop.py` builds and previews without replacing the daily installation. Package/release exports remain separate and require clean committed source.

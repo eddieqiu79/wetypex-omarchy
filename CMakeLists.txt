@@ -77,13 +77,19 @@ if(NOT WETYPE_LAYER_SHELL STREQUAL "OFF")
     message(STATUS "WeTypeX Wayland V toolbar: Fcitx menu fallback (layer-shell unavailable)")
   endif()
 endif()
+option(WETYPE_DEVELOPMENT_BUILD "Label local builds and disable production update actions" ON)
 add_executable(fcitx5-wetypex-settings src/settings/main.cpp)
+if(WETYPE_DEVELOPMENT_BUILD)
+  target_compile_definitions(fcitx5-wetypex-settings PRIVATE WETYPE_DEVELOPMENT_BUILD)
+endif()
 target_link_libraries(fcitx5-wetypex-settings PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::DBus ${WETYPE_QT_PACKAGE}::Network ${WETYPE_QT_PACKAGE}::Svg ${WETYPE_QT_PACKAGE}::Concurrent)
 target_compile_definitions(fcitx5-wetypex-settings PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
   WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
   WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-transfer"
   WETYPE_UPDATE="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-update"
+  WETYPE_SETUP_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-setup"
+  WETYPE_SERVICE_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-omarchy-setup"
   WETYPE_PACKAGE_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-omarchy-package"
   "WETYPE_VERSION=\"Omarchy ${WETYPE_OMARCHY_VERSION} (engine ${PROJECT_VERSION})\"")
 add_executable(fcitx5-wetypex-clipboard-set src/clipboard/main.cpp)

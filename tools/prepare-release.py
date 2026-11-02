@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Validate an exact release tag and construct an adapter-only release manifest."""
 import argparse
+import datetime
 import hashlib
 import json
 from pathlib import Path
 import re
+import runpy
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +43,10 @@ def digest(path):
 
 def bundle(directory, tag, version, commit):
     source = json.loads((directory / "source-manifest.json").read_text())
+    snapshot = source.get("build_snapshot", "")
+    if not isinstance(snapshot, str) or not re.fullmatch(r"[0-9]{4}/[0-9]{2}/[0-9]{2}", snapshot):
+        raise ValueError("Release bundles require a reviewed Arch archive snapshot, not rolling CI")
+    datetime.datetime.strptime(snapshot, "%Y/%m/%d")
     expected = version.replace("-rc.", "rc")
     if (source.get("commit"), source.get("project_version"), source.get("version"), source.get("epoch")) != (commit, version, expected, 1):
         raise ValueError("Build provenance does not match release tag/version/epoch")
@@ -51,14 +57,14 @@ def bundle(directory, tag, version, commit):
     if not re.fullmatch(r"wetypex-omarchy-[A-Za-z0-9._+-]+-x86_64\.pkg\.tar\.zst", package.name):
         raise ValueError("Unexpected package filename")
     metadata = subprocess.check_output(["bsdtar", "-xOf", str(package), ".PKGINFO"], text=True)
-    info = dict(line.split(" = ", 1) for line in metadata.splitlines() if " = " in line)
-    if info.get("pkgname") != "wetypex-omarchy" or info.get("arch") != "x86_64" or info.get("pkgver") != "1:" + expected + "-1":
+    info = runpy.run_path(str(ROOT/"omarchy/wetypex-omarchy-package"))["package_info"](metadata)
+    if info.get("pkgname") != ["wetypex-omarchy"] or info.get("arch") != ["x86_64"] or info.get("pkgver") != ["1:" + expected + "-1"]:
         raise ValueError("Package metadata does not match expected adapter/version/architecture")
     source_archive = directory / "wetypex-omarchy-source.tar.gz"
     if digest(source_archive) != source.get("source_sha256"):
         raise ValueError("Source archive checksum mismatch")
     required = {"source-manifest.json", "wetypex-omarchy-source.tar.gz", "PKGBUILD",
-                "wetypex-omarchy.install", "build-packages.txt", "SHA256SUMS", package.name}
+                "wetypex-omarchy.install", "build-packages.txt", "SHA256SUMS", "wetypex-install.pyz", package.name}
     if {p.name for p in directory.iterdir()} != required:
         raise ValueError("Release directory has unexpected or missing assets")
     manifest = {
@@ -67,9 +73,12 @@ def bundle(directory, tag, version, commit):
         "channel": "preview" if "-rc." in version else "stable",
         "architecture": "x86_64", "runtime_version": source["runtime_version"],
         "package": {"name": package.name, "sha256": digest(package),
-                    "size": package.stat().st_size, "pacman_version": info["pkgver"]},
+                    "size": package.stat().st_size, "pacman_version": info["pkgver"][0]},
+        "installer": {"name": "wetypex-install.pyz", "sha256": digest(directory/"wetypex-install.pyz")},
         "source": {"name": source_archive.name, "sha256": source["source_sha256"]},
-        "installation": "manual-pacman-U", "restart": "explicit-after-active-work-finishes",
+        "compatibility": {"dependencies": info.get("depend", []),
+                          "policy": "installed-dependencies-required", "build_snapshot": source.get("build_snapshot", "unrecorded")},
+        "installation": "verified-package-client", "restart": "explicit-after-active-work-finishes",
     }
     (directory / "release-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     assets = sorted(p for p in directory.iterdir() if p.name != "SHA256SUMS")

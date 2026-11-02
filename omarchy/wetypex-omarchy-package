@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Discover, verify and install this fork's immutable Arch releases.
-
-No command obtains the proprietary runtime, activates services or restarts input.
-Installation requires --confirm and pacman's interactive authorization.
-"""
+"""Verified, resumable package updates. Never activates services or reads identity."""
 import argparse
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -14,132 +12,480 @@ import platform
 import re
 import runpy
 import shutil
+import signal
+import stat
 import subprocess
+import sys
 import tempfile
+import time
 
 REPO = 'eddieqiu79/wetypex-omarchy'
 PREFIX = Path(__file__).resolve().parents[1]
+RUNTIME = '2.2.3.657'
+TAG_PATTERN = r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.[1-9]\d*)?'
+INSTALLER = '/usr/lib/wetypex-omarchy/install-package'
+INSTALLED_FILES = ('/usr/bin/fcitx5-wetypex-transfer', '/usr/bin/fcitx5-wetypex-account', '/usr/lib/fcitx5-wetypex/wetypex-engine-host')
+
+
+class OperationError(ValueError):
+    def __init__(self, code, message, retryable=False):
+        super().__init__(message)
+        self.code, self.retryable = code, retryable
+
 
 def policy():
     installed = PREFIX / 'bin/fcitx5-wetypex-update'
     source = PREFIX / 'scripts/fcitx5-wetypex-update.sh.in'
     return runpy.run_path(str(installed if installed.is_file() else source))
 
+
 def run(args, timeout=120):
-    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          env=dict(os.environ, LC_ALL='C.UTF-8')) as process:
+        try:
+            stdout, _ = process.communicate(timeout=timeout)
+        except BaseException:
+            process.kill()
+            process.wait()
+            raise
+        result = subprocess.CompletedProcess(args, process.returncode, stdout)
     if result.returncode:
-        # gh errors may contain temporary signed URLs. Never forward raw output.
-        raise ValueError('Command failed: ' + ' '.join(args[:3]) + '; check authentication, network and tool support.')
+        # Do not forward subprocess errors: they may contain signed URLs.
+        raise OperationError('tool-failed', '工具执行失败，请检查网络、验证工具及其认证状态。', True)
     return result.stdout
 
+
 def get_release(p, tag, channel):
-    if not re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.[1-9]\d*)?', tag):
-        raise ValueError('Invalid release tag')
+    if not re.fullmatch(TAG_PATTERN, tag):
+        raise OperationError('invalid-tag', '发布版本格式无效。')
     release = p['fetch_json'](f'https://api.github.com/repos/{REPO}/releases/tags/{tag}')
     if release.get('tag_name') != tag or release.get('draft') or release.get('immutable') is not True:
-        raise ValueError('Release must be published and immutable')
+        raise OperationError('untrusted-release', '发布必须已公开且不可变。')
     if bool(release.get('prerelease')) != ('-rc.' in tag) or (channel == 'stable' and release.get('prerelease')):
-        raise ValueError('Preview requires --channel preview')
+        raise OperationError('channel-mismatch', '预览版本需要主动选择预览频道。')
     return release
+
+
+def package_info(text):
+    fields = {}
+    for line in text.splitlines():
+        if ' = ' in line:
+            key, value = line.split(' = ', 1)
+            fields.setdefault(key, []).append(value)
+    return fields
+
+
+def regular_file(path):
+    return stat.S_ISREG(path.lstat().st_mode)
+
+
+def digest(path):
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
 
 def verify_package(package, manifest):
     expected = manifest['package']
-    if package.stat().st_size != expected['size']:
-        raise ValueError('Package size mismatch')
-    with package.open('rb') as f:
-        if hashlib.file_digest(f, 'sha256').hexdigest() != expected['sha256']:
-            raise ValueError('Package digest mismatch')
-    data = run(['bsdtar', '-xOf', str(package), '.PKGINFO']).decode()
-    info = dict(line.split(' = ', 1) for line in data.splitlines() if ' = ' in line)
-    if (info.get('pkgname'), info.get('pkgver'), info.get('arch')) != ('wetypex-omarchy', expected['pacman_version'], 'x86_64'):
-        raise ValueError('Package identity/version/architecture mismatch')
+    if not regular_file(package) or package.stat().st_size != expected['size'] or digest(package) != expected['sha256']:
+        raise OperationError('package-integrity', '安装包内容校验失败，请重新下载。', True)
+    info = package_info(run(['bsdtar', '-xOf', str(package), '.PKGINFO']).decode('utf-8'))
+    for key, value in [('pkgname', 'wetypex-omarchy'), ('pkgver', expected['pacman_version']), ('arch', 'x86_64')]:
+        if info.get(key) != [value]:
+            raise OperationError('package-identity', '安装包身份、版本或架构不匹配。')
+    declared = manifest.get('compatibility', {}).get('dependencies')
+    if declared is not None and sorted(declared) != sorted(info.get('depend', [])):
+        raise OperationError('dependency-mismatch', '发布清单与安装包的依赖不一致。')
+    return info
+
+
+def dependencies_satisfied(dependencies):
+    if not isinstance(dependencies, list) or any(not isinstance(d, str) or not re.fullmatch(r'[A-Za-z0-9@_+.:<>=~-]+', d) or d.startswith('-') for d in dependencies):
+        raise OperationError('invalid-dependencies', '安装包依赖格式无效。')
+    if not dependencies:
+        return
+    result = subprocess.run(['pacman', '-T', '--', *dependencies], capture_output=True, text=True,
+                            env=dict(os.environ, LC_ALL='C.UTF-8'))
+    if result.returncode == 127:
+        missing = [d for d in result.stdout.splitlines() if d in dependencies]
+        raise OperationError('incompatible-system', '当前系统缺少兼容依赖：' + ', '.join(missing) + '。请通过系统更新工具处理后重试。', True)
+    if result.returncode:
+        raise OperationError('dependency-check-failed', '无法检查系统依赖，未开始安装。', True)
+
 
 def installed_version():
+    if not shutil.which('pacman'):
+        return None
     result = subprocess.run(['pacman', '-Q', 'wetypex-omarchy'], capture_output=True, text=True)
-    return result.stdout.split()[1] if result.returncode == 0 else None
+    fields = result.stdout.split()
+    return fields[1] if result.returncode == 0 and len(fields) == 2 else None
 
-def download(p, tag, channel, directory):
+
+def current_project_version():
+    version = installed_version()
+    if version:
+        match = re.fullmatch(r'1:(\d+\.\d+\.\d+)(?:rc(\d+))?-\d+', version)
+        if match:
+            return match[1] + ('-rc.' + match[2] if match[2] else '')
+        return 'unknown'
+    return '0.0.0'
+
+
+def atomic_json(path, data, mode=0o600):
+    fd, name = tempfile.mkstemp(prefix='.state-', dir=path.parent)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+            json.dump(data, stream, ensure_ascii=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def private_directory(directory):
+    directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+    st = directory.lstat()
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.geteuid() or st.st_mode & 0o022:
+        raise OperationError('unsafe-cache', '缓存目录必须由当前用户独占写入，且不能是符号链接。')
+
+
+def state_directory():
+    return Path(os.environ.get('XDG_STATE_HOME', Path.home()/'.local/state'))/'wetypex-omarchy/update'
+
+
+@contextmanager
+def operation_lock(directory):
+    private_directory(directory)
+    fd = os.open(directory/'operation.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or st.st_nlink != 1:
+            raise OperationError('unsafe-lock', '更新锁文件不安全。')
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise OperationError('busy', '另一个更新操作正在进行，请稍后重试。', True)
+        yield
+    finally:
+        os.close(fd)
+
+
+class Events:
+    def __init__(self, directory, json_output=False):
+        self.directory, self.json_output = directory, json_output
+        self.record = {'schema': 1, 'operation_id': f'{time.time_ns()}-{os.getpid()}'}
+
+    def emit(self, stage, message, **data):
+        self.record.update(stage=stage, message=message, **data)
+        atomic_json(self.directory/'operation.json', self.record)
+        if self.json_output:
+            print(json.dumps(self.record, ensure_ascii=False), flush=True)
+        else:
+            print(message, flush=True)
+
+
+class ReleaseVerifier:
+    """New releases carry a tag-bound Sigstore bundle; legacy ones use gh release.
+
+    Anonymous verification never falls back to hashes on failure. gh supplies
+    the Sigstore/TUF trust roots; no trust root is taken from release assets.
+    """
+    BUNDLE = 'release-attestation.sigstore.json'
+
+    def __init__(self, p, release, tag, emit):
+        self.p, self.release, self.tag, self.emit = p, release, tag, emit
+        self.assets = {a['name']: a for a in release.get('assets', [])}
+        self.anonymous = self.BUNDLE in self.assets
+        self.work = None
+        self.commit = None
+
+    def __enter__(self):
+        self.work = tempfile.TemporaryDirectory(prefix='wetypex-proof-')
+        try:
+            if self.anonymous:
+                run(['gh', 'attestation', 'verify', '--help'])
+                self.fetch(Path(self.work.name), self.BUNDLE, limit=16 * 1024 * 1024)
+            else:
+                run(['gh', 'release', 'verify', '--help'])
+                run(['gh', 'release', 'verify-asset', '--help'])
+                run(['gh', 'release', 'verify', self.tag, '--repo', REPO])
+            return self
+        except BaseException:
+            self.work.cleanup()
+            raise
+
+    def __exit__(self, *args):
+        self.work.cleanup()
+
+    def fetch(self, directory, name, limit=2 * 1024 * 1024 * 1024):
+        if not self.anonymous:
+            run(['gh', 'release', 'download', self.tag, '--repo', REPO, '--dir', str(directory), '--pattern', name], timeout=600)
+            return
+        import urllib.request
+        asset = self.assets.get(name, {})
+        url = f'https://github.com/{REPO}/releases/download/{self.tag}/{name}'
+        size = asset.get('size')
+        if (asset.get('browser_download_url') != url or type(size) is not int
+                or not 0 < size <= limit or Path(name).name != name):
+            raise OperationError('invalid-asset', '发布附件信息无效。')
+        request = urllib.request.Request(url, headers={'User-Agent': 'wetypex-omarchy-installer'})
+        start, last = time.monotonic(), 0
+        with urllib.request.build_opener(self.p['SafeRedirect']()).open(request, timeout=30) as response, (directory/name).open('xb') as out:
+            received = 0
+            while True:
+                block = response.read(min(256 * 1024, size - received + 1))
+                if not block: break
+                received += len(block)
+                if received > size or time.monotonic() - start > 600:
+                    raise OperationError('download-incomplete', '下载大小异常或超时，请重试。', True)
+                out.write(block)
+                now = time.monotonic()
+                if name.endswith('.pkg.tar.zst') and now - last > 0.2:
+                    last = now
+                    self.emit('downloading', '正在下载安装包…', bytes_received=received, bytes_total=size)
+            if received != size:
+                raise OperationError('download-incomplete', '下载未完成，可以重试。', True)
+
+    def verify(self, file):
+        if not self.anonymous:
+            run(['gh', 'release', 'verify-asset', self.tag, str(file), '--repo', REPO], timeout=180)
+            return
+        if file.name == 'release-manifest.json':
+            if not regular_file(file) or file.stat().st_size > 2 * 1024 * 1024:
+                raise OperationError('invalid-manifest', '发布清单无效。')
+            manifest = json.loads(file.read_text(encoding='utf-8'))
+            self.p['validate_manifest'](manifest, self.tag)
+            self.commit = manifest['commit']
+        if not self.commit:
+            raise OperationError('verification-order', '必须先验证发布清单。')
+        workflow = f'https://github.com/{REPO}/.github/workflows/prepare-release.yml@refs/tags/{self.tag}'
+        cmd = ['gh', 'attestation', 'verify', str(file), '--bundle', str(Path(self.work.name)/self.BUNDLE),
+               '--repo', REPO, '--cert-identity', workflow, '--source-ref', 'refs/tags/'+self.tag,
+               '--source-digest', self.commit, '--signer-digest', self.commit, '--deny-self-hosted-runners']
+        # Do not consult or require the user's GitHub credentials in this route.
+        env = {k:v for k,v in os.environ.items() if k not in
+               ('GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_HOST')}
+        env.update(GH_CONFIG_DIR=str(Path(self.work.name)/'gh-config'), GH_PROMPT_DISABLED='1', LC_ALL='C.UTF-8')
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env) as process:
+            try:
+                process.communicate(timeout=180)
+            except BaseException:
+                process.kill(); process.wait(); raise
+            if process.returncode:
+                raise OperationError('attestation-failed', '构建证明验证失败，请检查网络或验证工具版本；不会跳过校验。', True)
+
+
+def download(p, tag, channel, directory, emit=lambda *a, **k: None):
     release = get_release(p, tag, channel)
-    # Fail before downloading if this gh version cannot verify release attestations.
-    run(['gh', 'release', 'verify', '--help'])
-    run(['gh', 'release', 'verify-asset', '--help'])
-    run(['gh', 'release', 'verify', tag, '--repo', REPO])
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    destination = directory / tag
+    emit('verifying-release', '正在验证发布来源…', tag=tag)
+    with ReleaseVerifier(p, release, tag, emit) as verifier:
+        return download_verified(p, release, verifier, tag, directory, emit)
+
+
+def download_verified(p, release, verifier, tag, directory, emit):
+    private_directory(directory)
+    destination = directory/tag
     if destination.exists():
-        raise ValueError('Destination already exists; keep it for recovery and select a new download directory')
-    with tempfile.TemporaryDirectory(prefix='.wetypex-download-', dir=directory) as temporary:
-        work = Path(temporary)
-        run(['gh', 'release', 'download', tag, '--repo', REPO, '--dir', str(work), '--pattern', 'release-manifest.json'])
-        manifest_path = work / 'release-manifest.json'
-        run(['gh', 'release', 'verify-asset', tag, str(manifest_path), '--repo', REPO])
-        manifest = json.loads(manifest_path.read_text())
-        package = p['validate_manifest'](manifest, tag)
-        if manifest.get('runtime_version') != '2.2.3.657':
-            raise ValueError('Runtime requirement changed; manual migration review required')
-        asset = next((a for a in release.get('assets', []) if a.get('name') == package['name']), {})
-        if asset.get('size') != package['size']:
-            raise ValueError('Release asset metadata mismatch')
-        run(['gh', 'release', 'download', tag, '--repo', REPO, '--dir', str(work), '--pattern', package['name']], timeout=600)
-        file = work / package['name']
-        run(['gh', 'release', 'verify-asset', tag, str(file), '--repo', REPO], timeout=180)
-        verify_package(file, manifest)
-        # Publish complete verified files only. Partial downloads stay private and are removed.
-        work.rename(destination)
-    return destination / package['name'], manifest
+        private_directory(destination)
+        manifest_path = destination/'release-manifest.json'
+        if not manifest_path.exists() or not regular_file(manifest_path):
+            raise OperationError('cache-incomplete', '已有目录缺少发布清单；请保留原目录并选择其他缓存目录。')
+        # A local journal is never proof of authenticity. Revalidate cached bytes.
+        verifier.verify(manifest_path)
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        expected = p['validate_manifest'](manifest, tag)
+        file = destination/expected['name']
+        emit('verifying-cache', '正在检查已下载的软件包…', tag=tag)
+    else:
+        with tempfile.TemporaryDirectory(prefix='.download-', dir=directory) as temporary:
+            work = Path(temporary)
+            verifier.fetch(work, 'release-manifest.json', limit=2 * 1024 * 1024)
+            verifier.verify(work/'release-manifest.json')
+            manifest = json.loads((work/'release-manifest.json').read_text(encoding='utf-8'))
+            expected = p['validate_manifest'](manifest, tag)
+            work.rename(destination)
+        file = destination/expected['name']
+    if manifest.get('runtime_version') != RUNTIME:
+        raise OperationError('runtime-review-required', '运行资源版本已变化，需要先审核迁移步骤。')
+    asset = next((a for a in release.get('assets', []) if a.get('name') == expected['name']), {})
+    if asset.get('size') != expected['size']:
+        raise OperationError('asset-mismatch', '发布资产信息与清单不一致。')
+    # New manifests permit checking before the large asset download. Legacy
+    # manifests are checked against .PKGINFO immediately after verification.
+    declared = manifest.get('compatibility', {}).get('dependencies')
+    if declared is not None:
+        dependencies_satisfied(declared)
+    if file.exists():
+        verify_package(file, manifest)  # Never silently overwrite a damaged cache.
+    else:
+        emit('downloading', '正在下载安装包；中断后可以重试…', tag=tag)
+        with tempfile.TemporaryDirectory(prefix='.asset-', dir=destination) as temporary:
+            work = Path(temporary)
+            verifier.fetch(work, expected['name'])
+            emit('verifying-package', '正在验证安装包…', tag=tag)
+            verifier.verify(work/expected['name'])
+            verify_package(work/expected['name'], manifest)
+            (work/expected['name']).rename(file)
+    verifier.verify(file)
+    info = verify_package(file, manifest)
+    dependencies_satisfied(info.get('depend', []))
+    return file, manifest
+
+
+def check_install(target, allow_downgrade=False):
+    for plugin in (Path.home()/'.local/lib/fcitx5/wetypex.so', Path.home()/'.local/lib/wetypex-omarchy/lib/fcitx5/wetypex.so'):
+        if plugin.exists():
+            raise OperationError('migration-required', '检测到用户目录中的输入法插件，请先处理安装来源冲突。')
+    previous = installed_version()
+    if previous and int(run(['vercmp', target, previous]).decode()) < 0 and not allow_downgrade:
+        raise OperationError('downgrade-refused', '较旧版本仅可通过明确的恢复操作安装。')
+    if Path('/var/lib/pacman/db.lck').exists():
+        raise OperationError('package-manager-busy', '系统正在安装其他软件，请稍后重试。', True)
+
+
+def local_status():
+    installed = installed_version()
+    state = state_directory()/'operation.json'
+    record = {}
+    if state.is_file() and regular_file(state):
+        try:
+            record = json.loads(state.read_text(encoding='utf-8'))
+        except (ValueError, OSError):
+            pass
+    # Metadata only: never access account or device identity directories.
+    origin = 'unrecorded'
+    receipt = Path('/var/lib/wetypex-omarchy/installed.json')
+    if receipt.is_file():
+        try:
+            saved = json.loads(receipt.read_text(encoding='utf-8'))
+            hashes = saved.get('files', {})
+            if (saved.get('pacman_version') == installed and set(hashes) == set(INSTALLED_FILES)
+                    and all(Path(path).is_file() and digest(Path(path)) == hashes[path] for path in INSTALLED_FILES)):
+                origin = 'verified-release'
+                if record.get('target_version') == installed and record.get('package_sha256') == saved.get('sha256'):
+                    record.update(stage='installed', activation='pending')
+        except (OSError, ValueError):
+            pass
+    return {'status': 'local-status', 'installed_version': installed, 'origin': origin,
+            'operation': record, 'running_version': 'not-probed',
+            'developer_checkout': (PREFIX/'CMakeLists.txt').is_file()}
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('check', 'download', 'install'))
+    parser.add_argument('action', choices=('check', 'download', 'install', 'resume', 'status', 'preflight'))
     parser.add_argument('--channel', choices=('stable', 'preview'), default='stable')
-    parser.add_argument('--tag', help='Exact immutable release; default is newest in the selected channel')
+    parser.add_argument('--tag')
     parser.add_argument('--directory', type=Path, default=Path(os.environ.get('XDG_CACHE_HOME', Path.home()/'.cache'))/'wetypex-omarchy/packages')
-    parser.add_argument('--confirm', action='store_true', help='Authorize the adapter package transaction only; pacman still asks interactively')
-    parser.add_argument('--allow-downgrade', action='store_true', help='Explicit recovery using an older compatible release')
+    parser.add_argument('--confirm', action='store_true')
+    parser.add_argument('--fresh-cache', action='store_true', help='Download into a new cache directory; preserve existing files')
+    parser.add_argument('--allow-downgrade', action='store_true')
+    parser.add_argument('--json', action='store_true', help='Emit newline-delimited progress objects')
+    parser.add_argument('--authorization', choices=('terminal', 'desktop', 'terminal-bootstrap'), default='terminal')
     args = parser.parse_args(argv)
+    installing = args.action in ('install', 'resume')
     if os.geteuid() == 0:
-        parser.error('Run as your ordinary desktop user; only pacman is elevated')
-    if args.action == 'install' and not args.confirm:
-        parser.error('install requires --confirm; download does not install')
-    if platform.machine() != 'x86_64': parser.error('Only x86_64 is supported')
+        parser.error('Run as the desktop user; only the package transaction is elevated')
+    if installing and not args.confirm:
+        parser.error('install/resume requires --confirm')
+    if args.authorization == 'terminal-bootstrap' and args.json:
+        parser.error('Bootstrap installation requires an interactive terminal')
+    events = None
+    if args.action in ('download', 'check'):
+        def cancelled(signum, frame):
+            raise OperationError('cancelled', '已取消准备，已完成的下载会保留。', True)
+        signal.signal(signal.SIGTERM, cancelled)
     try:
+        if platform.machine() != 'x86_64':
+            raise OperationError('unsupported-architecture', '目前仅支持 x86_64。')
+        if args.action == 'status':
+            print(json.dumps(local_status(), ensure_ascii=False)); return 0
+        if args.action == 'preflight':
+            missing = [c for c in ('pacman', 'vercmp', 'bsdtar', 'gh') if not shutil.which(c)]
+            print(json.dumps({'status': 'ready' if not missing else 'tools-missing', 'missing': missing,
+                              'installed_version': installed_version(), 'build_tools_required': False,
+                              'desktop_authorization_available': bool(shutil.which('pkexec')),
+                              'verification': 'gh-release-attestation', 'activation': 'separate'}, ensure_ascii=False))
+            return 1 if missing else 0
         p = policy()
-        version_file = PREFIX/'share/fcitx5-wetypex/VERSION'
-        if not version_file.is_file(): version_file = PREFIX/'VERSION'
-        current = version_file.read_text().strip() if version_file.is_file() else '0.0.0'
-        result = p['check_releases'](args.channel, current, '2.2.3.657', 'x86_64')
         if args.action == 'check':
-            print(json.dumps(result)); return 0
-        for command in ('gh', 'bsdtar'):
-            if not shutil.which(command): raise ValueError('Install the required tool first: ' + command)
-        tag = args.tag or result.get('tag')
-        if not tag: raise ValueError('No release exists in this channel; no package downloaded')
-        if args.action == 'install':
-            if not shutil.which('pacman') or not shutil.which('vercmp') or not shutil.which('sudo'):
-                raise ValueError('Arch pacman, vercmp and sudo are required')
-            if (Path.home()/'.local/lib/fcitx5/wetypex.so').exists():
-                raise ValueError('Private-prefix plugin detected; review migration before installing a system package')
-            previous = installed_version()
-            # Resolve and compare before the download/transaction, including explicitly requested old tags.
-            target = '1:' + tag[1:].replace('-rc.', 'rc') + '-1'
-            if previous and int(run(['vercmp', target, previous]).decode()) < 0 and not args.allow_downgrade:
-                raise ValueError('Refusing downgrade; recovery requires --allow-downgrade')
-        package, manifest = download(p, tag, args.channel, args.directory.expanduser().resolve())
-        print(json.dumps({'status': 'verified', 'tag': tag, 'package': str(package), 'commit': manifest['commit']}), flush=True)
-        if args.action == 'install':
-            print(run(['pacman', '-Qip', str(package)]).decode(), flush=True)
-            print('Installing the adapter only. Finish active input/transfers first. Services, runtime and pairing are unchanged.', flush=True)
-            rc = subprocess.run(['sudo', 'pacman', '-U', str(package)]).returncode
-            if rc: return rc
-            print('Package installed. Running processes still need an explicit restart after active work finishes. See docs/ARCH.md.')
-        return 0
-    except (ValueError, OSError, subprocess.SubprocessError, KeyError, TypeError):
-        # Do not expose signed URLs or response bodies. Provide actionable categories above via safe local messages.
-        import sys
+            result = p['check_releases'](args.channel, current_project_version(), RUNTIME, 'x86_64')
+            if result.get('status') in ('available', 'current'):
+                dependencies_satisfied(result.get('compatibility', {}).get('dependencies', []))
+            result['installed_version'] = installed_version()
+            print(json.dumps(result, ensure_ascii=False)); return 0
+        for command in ('gh', 'bsdtar', 'pacman', 'vercmp'):
+            if not shutil.which(command):
+                raise OperationError('tool-missing', '缺少工具：' + command + '。请先安装所需系统依赖。', True)
+        with operation_lock(state_directory()):
+            tag = args.tag
+            directory = args.directory.expanduser().absolute()
+            channel = args.channel
+            if args.fresh_cache:
+                directory = directory/('retry-' + str(time.time_ns()))
+            if args.action == 'resume':
+                state = state_directory()/'operation.json'
+                if not state.is_file():
+                    raise OperationError('nothing-to-resume', '没有可继续的更新操作。')
+                old = json.loads(state.read_text(encoding='utf-8'))
+                if args.tag and args.tag != old.get('tag'):
+                    raise OperationError('operation-changed', '待安装版本已变化，请重新检查后确认。')
+                tag, channel = old.get('tag'), old.get('channel')
+                directory = Path(old.get('directory', str(directory)))
+                if not tag or channel not in ('stable', 'preview'):
+                    raise OperationError('nothing-to-resume', '没有可继续的更新操作。')
+            events = Events(state_directory(), args.json)
+            if not tag:
+                events.emit('checking', '正在检查发布版本…')
+                result = p['check_releases'](channel, current_project_version(), RUNTIME, 'x86_64')
+                if result.get('status') not in ('available', 'current'):
+                    raise OperationError(result.get('status', 'no-release'), '当前频道没有可直接安装的更新，请检查版本与频道。')
+                tag = result['tag']
+            events.emit('preparing', '正在准备更新…', tag=tag, channel=channel, directory=str(directory))
+            file, manifest = download(p, tag, channel, directory, events.emit)
+            target = manifest['package']['pacman_version']
+            events.emit('ready', '安装包已验证，可以安装。', target_version=target, package=str(file), package_sha256=manifest['package']['sha256'])
+            if installing:
+                check_install(target, args.allow_downgrade)
+                if args.authorization != 'terminal-bootstrap' and not Path(INSTALLER).is_file():
+                    raise OperationError('installer-missing', '当前安装缺少系统安装辅助程序，请按迁移说明完成首次升级。')
+                authorization = ['pkexec', '--disable-internal-agent'] if args.authorization == 'desktop' else ['sudo']
+                events.emit('authorizing', '请在系统授权窗口中确认安装。' if args.authorization == 'desktop' else '请在终端确认安装授权。')
+                # Keep stdout for structured progress; arbitrary package hook output
+                # must not enter the GUI protocol or diagnostic exports.
+                cmd = authorization + [INSTALLER, '--tag', tag, '--channel', channel, '--package', str(file)]
+                if args.allow_downgrade: cmd.append('--allow-downgrade')
+                if args.authorization == 'terminal-bootstrap':
+                    print('软件包已验证。系统包管理器将展示安装内容并请求密码，不会启用服务或重新关联设备。', flush=True)
+                    if input('开始安装？输入 yes 继续：').strip() != 'yes':
+                        raise OperationError('authorization-cancelled', '已取消安装，下载会保留。', True)
+                    result = subprocess.run(['sudo', 'pacman', '-U', '--', str(file)])
+                else:
+                    result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE if args.authorization == 'desktop' else None)
+                if result.returncode:
+                    if result.returncode in (126, 127):
+                        raise OperationError('authorization-cancelled', '安装授权未完成。安装包已保留，可以继续安装。', True)
+                    raise OperationError('install-failed', '安装未完成。安装包已保留，请检查系统依赖、网络和包管理器状态后继续。', True)
+                if installed_version() != target:
+                    raise OperationError('post-install-failed', '安装后的版本核对未通过，请检查系统软件包状态。', True)
+                events.emit('installed', '软件包已安装。运行中的输入法将在重新加载后使用新版本。', installed_version=target, activation='pending', retryable=False)
+            return 0
+    except (ValueError, OSError, EOFError, subprocess.SubprocessError, KeyError, TypeError):
         error = sys.exception()
-        message = str(error) if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError) else 'Network, verification or local tool failure; no unverified package was installed'
-        print('Package operation failed: ' + message, file=sys.stderr)
+        code = error.code if isinstance(error, OperationError) else 'operation-failed'
+        message = str(error) if isinstance(error, OperationError) else '网络、校验或本地工具操作失败；未确认安装成功。'
+        retryable = error.retryable if isinstance(error, OperationError) else True
+        if events:
+            events.emit('failed', message, error_code=code, retryable=retryable)
+        elif args.json:
+            print(json.dumps({'stage': 'failed', 'error_code': code, 'message': message, 'retryable': retryable}, ensure_ascii=False))
+        else:
+            print(message, file=sys.stderr)
         return 1
+
 
 if __name__ == '__main__':
     raise SystemExit(main())

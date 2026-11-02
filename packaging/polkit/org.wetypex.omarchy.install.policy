@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>WeTypeX Omarchy community</vendor>
+  <action id="org.wetypex.omarchy.install">
+    <description>Install a verified WeTypeX Omarchy release</description>
+    <description xml:lang="zh_CN">安装已验证的 WeTypeX Omarchy 发布包</description>
+    <message>Authentication is required to install the prepared WeTypeX update.</message>
+    <message xml:lang="zh_CN">请授权安装已准备好的 WeTypeX 更新。</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/wetypex-omarchy/install-package</annotate>
+  </action>
+</policyconfig>

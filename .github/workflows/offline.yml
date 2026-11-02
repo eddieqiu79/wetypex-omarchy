@@ -18,6 +18,8 @@ jobs:
           python3 tests/check-update-policy.py
           python3 tests/check-release-channel.py
           python3 tests/check-package-client.py
+          python3 tests/check-install-boundary.py
+          python3 tests/check-bootstrap.py
           python3 tests/check-account-preflight.py
           python3 tools/preflight.py
       - name: Check patch formatting

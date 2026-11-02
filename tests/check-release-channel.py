@@ -68,6 +68,15 @@ class ChannelTests(unittest.TestCase):
         release["assets"] = []
         with self.assertRaises(ValueError): self.check([release])
 
+    def test_optional_compatibility_metadata_fails_closed(self):
+        release, manifest = fixture()
+        for bad in ('anything', {'dependencies':'python'}, {'dependencies':['--root=/tmp']}):
+            with self.assertRaises(ValueError):
+                update['validate_manifest'](dict(manifest, compatibility=bad), manifest['tag'])
+        update['validate_manifest'](dict(manifest, compatibility={'dependencies':['python', 'qt6-base>=6.11.2']}), manifest['tag'])
+        with self.assertRaises(ValueError):
+            update['validate_manifest'](dict(manifest, schema=2), manifest['tag'])
+
     def test_runtime_changes_are_not_ordinary_updates(self):
         release, manifest = fixture()
         self.assertEqual(self.check([release], {manifest["tag"]: manifest}, runtime="other")["status"], "runtime-review-required")
@@ -98,10 +107,10 @@ class ChannelTests(unittest.TestCase):
             (root / "wetypex-omarchy-source.tar.gz").write_bytes(b"synthetic source")
             package = root / "wetypex-omarchy-1_0.2.0-1-x86_64.pkg.tar.zst"
             package.write_bytes(b"synthetic package")
-            source = {"commit": "b" * 40, "project_version": "0.2.0", "version": "0.2.0", "epoch": 1,
+            source = {"commit": "b" * 40, "project_version": "0.2.0", "version": "0.2.0", "epoch": 1, "build_snapshot": "2026/11/01",
                       "runtime_version": "2.2.3.657", "source_sha256": prepare["digest"](root / "wetypex-omarchy-source.tar.gz")}
             (root / "source-manifest.json").write_text(json.dumps(source))
-            for name in ("PKGBUILD", "wetypex-omarchy.install", "build-packages.txt", "SHA256SUMS"):
+            for name in ("PKGBUILD", "wetypex-omarchy.install", "build-packages.txt", "SHA256SUMS", "wetypex-install.pyz"):
                 (root / name).write_text("synthetic")
             metadata = "pkgname = wetypex-omarchy\narch = x86_64\npkgver = 1:0.2.0-1\n"
             with patch.object(prepare["subprocess"], "check_output", return_value=metadata.replace("x86_64", "aarch64")):

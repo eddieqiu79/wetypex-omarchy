@@ -6,6 +6,10 @@ on:
         description: Existing reviewed tag (vX.Y.Z or vX.Y.Z-rc.N)
         required: true
         type: string
+      archive_snapshot:
+        description: Reviewed compatible Arch archive date (YYYY/MM/DD), tested for this release
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -27,7 +31,14 @@ jobs:
       - id: version
         env:
           RELEASE_TAG: ${{ inputs.tag }}
+          WORKFLOW_REF: ${{ github.ref }}
+          WORKFLOW_SHA: ${{ github.sha }}
+          ARCHIVE_SNAPSHOT: ${{ inputs.archive_snapshot }}
         run: |
+          [[ "$ARCHIVE_SNAPSHOT" =~ ^[0-9]{4}/[0-9]{2}/[0-9]{2}$ ]]
+          python3 -c 'import datetime,os; datetime.datetime.strptime(os.environ["ARCHIVE_SNAPSHOT"], "%Y/%m/%d")'
+          test "$WORKFLOW_REF" = "refs/tags/$RELEASE_TAG"
+          test "$WORKFLOW_SHA" = "$(git rev-parse HEAD)"
           python3 tools/prepare-release.py --tag "$RELEASE_TAG" > /tmp/validated-release.json
           git merge-base --is-ancestor HEAD origin/main
           test -f "docs/releases/$RELEASE_TAG.md"
@@ -45,6 +56,7 @@ jobs:
     uses: ./.github/workflows/arch.yml
     with:
       source_ref: ${{ needs.validate.outputs.commit }}
+      archive_snapshot: ${{ inputs.archive_snapshot }}
       artifact_name: release-candidate-${{ github.run_id }}
   draft:
     needs: [validate, build]
@@ -52,6 +64,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -68,7 +82,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libarchive-tools
+          python3 tools/build-installer.py --output /tmp/release-assets/wetypex-install.pyz
           python3 tools/prepare-release.py --tag "$RELEASE_TAG" --assets /tmp/release-assets
+      - name: Attest exact-tag release assets for anonymous verification
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: /tmp/release-assets/*
+      - name: Include public verification bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: cp -- "$BUNDLE_PATH" /tmp/release-assets/release-attestation.sigstore.json
       - name: Create draft only (never publish or replace assets)
         env:
           GH_TOKEN: ${{ github.token }}
