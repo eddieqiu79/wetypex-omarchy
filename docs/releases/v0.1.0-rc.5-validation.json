@@ -1,0 +1,40 @@
+{
+  "tag": "v0.1.0-rc.5",
+  "commit": "20ec1cac92e5966268eba61a55fa29ac3f902d5c",
+  "release": "https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.5",
+  "immutable": true,
+  "workflow": "https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/41414138638",
+  "workflow_conclusion": "success",
+  "local_candidate_tests": {
+    "passed": 13,
+    "total": 13,
+    "seconds": 8.56
+  },
+  "checksum_verification": "passed",
+  "anonymous_attestation_verified": [
+    "release-manifest.json",
+    "wetypex-install.pyz",
+    "wetypex-omarchy-1_0.1.0rc5-1-x86_64.pkg.tar.zst"
+  ],
+  "github_release_verification": "passed",
+  "package_sha256": "2b90893e9462e742f496694a67b91e1d6b20feb522baf22d7da15f9cd0409130",
+  "snapshot": "2026/10/01",
+  "host_missing_dependencies": [],
+  "host_installation": "passed-published-bootstrap",
+  "host_installed_version": "1:0.1.0rc5-1",
+  "device_validation": "not-repeated",
+  "host_file_check": {
+    "total": 165,
+    "altered": 0
+  },
+  "host_prerequisite_check": "ready",
+  "host_link_check": {
+    "settings": "no-missing-libraries",
+    "transfer": "no-missing-libraries",
+    "fcitx_plugin": "no-missing-libraries"
+  },
+  "activation": "services-not-restarted",
+  "running_version": "not-probed",
+  "installation_origin_receipt": "unrecorded-bootstrap-route",
+  "dependency_recovery": "Official Arch archive packages with pacman-key signature verification after mirror HTTP 404"
+}
