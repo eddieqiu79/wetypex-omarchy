@@ -1,0 +1,43 @@
+{
+  "tag": "v0.1.0-rc.6",
+  "commit": "452d3c53007f04cd5e72978ef88797bcd7fb45dc",
+  "release": "https://github.com/eddieqiu79/wetypex-omarchy/releases/tag/v0.1.0-rc.6",
+  "immutable": true,
+  "workflow": "https://github.com/eddieqiu79/wetypex-omarchy/actions/runs/41458795325",
+  "workflow_conclusion": "success",
+  "local_test_suites": {
+    "passed": 13,
+    "total": 13
+  },
+  "layout_matrix": {
+    "widths": [
+      480,
+      600,
+      720,
+      960,
+      1280
+    ],
+    "heights": [
+      320,
+      540
+    ],
+    "scale_factors": [
+      1,
+      1.25,
+      1.5,
+      2
+    ],
+    "pages": 8,
+    "result": "passed"
+  },
+  "font_regression": "18-point long descriptions and key groups passed",
+  "visual_inspection": "offscreen narrow screenshots inspected; brand clipping corrected",
+  "anonymous_signature_verification": "passed-manifest-installer-package",
+  "verifier": "system github-cli 2.100.0",
+  "checksum_verification": "passed",
+  "package_sha256": "c2e805dffdaea8060ddad54d88d5061b0bc63f27c3c62f4e19cef7dd17576b89",
+  "build_snapshot": "2026/10/01",
+  "host_dependencies": "satisfied",
+  "host_installation": "not-performed-rc5-remains-installed",
+  "real_device_testing": "not-repeated-ui-only-change"
+}
