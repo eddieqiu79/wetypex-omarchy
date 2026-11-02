@@ -22,7 +22,7 @@
   "host_missing_dependencies": [],
   "host_installation": "passed-published-bootstrap",
   "host_installed_version": "1:0.1.0rc5-1",
-  "device_validation": "not-repeated",
+  "device_validation": "deferred-user-unavailable",
   "host_file_check": {
     "total": 165,
     "altered": 0
@@ -33,8 +33,22 @@
     "transfer": "no-missing-libraries",
     "fcitx_plugin": "no-missing-libraries"
   },
-  "activation": "services-not-restarted",
-  "running_version": "not-probed",
+  "activation": "fcitx-and-sync-user-services-restarted",
+  "running_version": "installed-rc5-plugin-mapping-confirmed",
   "installation_origin_receipt": "unrecorded-bootstrap-route",
-  "dependency_recovery": "Official Arch archive packages with pacman-key signature verification after mirror HTTP 404"
+  "dependency_recovery": "Official Arch archive packages with pacman-key signature verification after mirror HTTP 404",
+  "input_method": {
+    "selected": "wetypex",
+    "fcitx_state": 2,
+    "typed_input_acceptance": "not-tested"
+  },
+  "service_checks": {
+    "fcitx": "active-running",
+    "sync": "active-running",
+    "automatic_restarts": 0
+  },
+  "settings_window": {
+    "executable": "/usr/bin/fcitx5-wetypex-settings",
+    "visible": true
+  }
 }
