@@ -1,10 +1,13 @@
 #pragma once
 #include "../common/qt_helpers.hpp"
+#include "responsive.hpp"
 
 #include <QAbstractButton>
 #include <QBoxLayout>
 #include <QFile>
 #include <QFrame>
+#include <QComboBox>
+#include <QListWidget>
 #include <QIcon>
 #include <QKeyEvent>
 #include <QLabel>
@@ -14,7 +17,6 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QScreen>
 #include <QResizeEvent>
 #include <QStandardPaths>
 #include <QSvgRenderer>
@@ -214,18 +216,37 @@ protected:
 };
 
 class Window final : public QWidget {
+  void reflowNavigation() {
+    auto *sidebar = findChild<QWidget *>("sidebar");
+    auto *nav = findChild<QListWidget *>("navigation");
+    auto *compact = findChild<QComboBox *>("compactNavigation");
+    auto *content = findChild<QWidget *>("settingsContent");
+    auto *brand = findChild<QWidget *>("brandRow");
+    if (!sidebar || !nav || !compact || !content || !brand) return;
+    const auto margins = sidebar->layout()->contentsMargins();
+    const int sideWidth = qMax(brand->minimumSizeHint().width(), nav->sizeHintForColumn(0)) +
+                          margins.left() + margins.right() + 2 * nav->frameWidth();
+    // The content preference is independent of which navigation is visible.
+    auto *pages = content->findChild<QWidget *>("settingsPages");
+    if (!pages) return;
+    const bool full = width() >= sideWidth + pages->sizeHint().width();
+    if (sidebar->width() != sideWidth) sidebar->setFixedWidth(sideWidth);
+    if (sidebar->isHidden() == full) sidebar->setVisible(full);
+    if (compact->isHidden() != full) compact->setVisible(!full);
+  }
 public:
   explicit Window(QWidget *parent = nullptr) : QWidget(parent) {
     setWindowFlags(Qt::Window);
-    setMinimumSize(480, 320);
-    const auto available = screen()->availableGeometry().size();
-    resize(QSize(960, 720).boundedTo(available).expandedTo(minimumSize()));
   }
 protected:
   void resizeEvent(QResizeEvent *event) override {
     QWidget::resizeEvent(event);
-    if (auto *sidebar = findChild<QWidget *>("sidebar"))
-      sidebar->setFixedWidth(width() < 680 ? 168 : width() < 820 ? 180 : 211);
+    reflowNavigation();
+  }
+  bool event(QEvent *event) override {
+    const bool result = QWidget::event(event);
+    if (event->type() == QEvent::LayoutRequest) reflowNavigation();
+    return result;
   }
 };
 
@@ -245,7 +266,7 @@ inline QFrame *separator() {
 
 inline QWidget *row(const QString &title, const QString &subtitle = {},
                     QWidget *trailing = nullptr, int height = 62) {
-  auto *widget = new QWidget;
+  auto *widget = new AdaptiveRow;
   widget->setObjectName("settingRow");
   widget->setMinimumHeight(height);
   auto *layout = new QHBoxLayout(widget);
@@ -284,6 +305,7 @@ inline Page page(const QString &title, bool scroll = true) {
   layout->setSpacing(16);
   auto *heading = new QLabel(title);
   heading->setObjectName("pageHeading");
+  heading->setWordWrap(true);
   heading->setContentsMargins(12, 0, 0, 0);
   heading->setMinimumHeight(30);
   layout->addWidget(heading);
@@ -308,9 +330,7 @@ inline QLabel *keyCap(const QString &text) {
   label->setObjectName("keyCap");
   label->setAlignment(Qt::AlignCenter);
   label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-  label->ensurePolished();
-  label->setMinimumWidth(qMax(25, label->fontMetrics().horizontalAdvance(text) + 16));
-  label->setMinimumHeight(qMax(22, label->fontMetrics().height() + 4));
+  label->setMargin(4); // QLabel recomputes its hints when font, text or DPI changes.
   static const QMap<QString, QString> icons = {
       {QStringLiteral("×"), "icon_delete_key"},
       {QStringLiteral("backslash-icon"), "icon_tips_backslash"},

@@ -2,8 +2,10 @@
 // Exercise the actual application entry point with an isolated XDG environment.
 #include <QApplication>
 #include <QFile>
+#include <QEventLoop>
 #include <QListWidget>
 #include <QLabel>
+#include <QComboBox>
 #include <QStackedWidget>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -30,21 +32,35 @@ public:
             exit(3);
             return;
           }
-          // Exercise all real pages at common tiled widths. Content wider
+          // Sweep unrelated sizes, not a list of device resolutions. Content wider
           // than the viewport must remain reachable, never silently clipped.
-          for (int width : {480, 600, 720, 960, 1280}) {
-            for (int height : {320, 540}) {
+          for (int width = 267; width <= 1362; width += 73) {
+            for (int height : {217, 539}) {
+              const int selection = nav->currentRow();
               w->resize(width, height);
+              processEvents();
+              if (nav->currentRow() != selection) { exit(10); return; }
               for (int page = 0; page < nav->count(); ++page) {
-                nav->setCurrentRow(page);
+                auto *compact = w->findChild<QComboBox *>("compactNavigation");
+                if (compact && compact->isVisible()) compact->setCurrentIndex(page);
+                else nav->setCurrentRow(page);
                 nav->scrollToItem(nav->item(page));
-                processEvents();
+                QEventLoop settled;
+                QTimer::singleShot(5, &settled, &QEventLoop::quit);
+                settled.exec();
                 if (w->width() != width || w->height() != height) { exit(5); return; }
-                if (!nav->viewport()->rect().contains(nav->visualItemRect(nav->item(page)).center())) {
+                auto *pages = w->findChild<QStackedWidget *>("settingsPages");
+                if (!pages || pages->currentIndex() != page || nav->currentRow() != page) {
+                  exit(11); return;
+                }
+                if (!nav->isVisible() && (!compact || !compact->isVisible() || compact->currentIndex() != page)) {
+                  exit(9); return;
+                }
+                if (nav->isVisible() && !nav->viewport()->rect().contains(nav->visualItemRect(nav->item(page)).center())) {
                   exit(9); return;
                 }
                 auto *brand = w->findChild<QLabel *>("brand");
-                if (!brand || brand->width() < brand->fontMetrics().horizontalAdvance(brand->text())) {
+                if (!brand || (brand->isVisible() && brand->width() < brand->fontMetrics().horizontalAdvance(brand->text()))) {
                   exit(8); return;
                 }
                 for (auto *scroll : w->findChildren<QScrollArea *>("pageScroll")) {
@@ -53,6 +69,14 @@ public:
                       (scroll->horizontalScrollBarPolicy() == Qt::ScrollBarAlwaysOff ||
                        scroll->horizontalScrollBar()->maximum() <= 0)) {
                     exit(6); return;
+                  }
+                }
+                for (auto *label : w->findChildren<QLabel *>()) {
+                  if (label->isVisible() && label->wordWrap() &&
+                      (label->objectName() == "rowTitle" || label->objectName() == "rowSubtitle") &&
+                      label->height() < label->heightForWidth(label->width())) {
+                    fprintf(stderr, "Wrapped row text clipped: page=%d width=%d height=%d required=%d text=%s\n", page, label->width(), label->height(), label->heightForWidth(label->width()), label->text().toUtf8().constData());
+                    exit(12); return;
                   }
                 }
               }

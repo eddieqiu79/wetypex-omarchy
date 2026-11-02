@@ -580,29 +580,12 @@ static QWidget *radioRow(QRadioButton *radio, QWidget *trailing = nullptr) {
     layout->addWidget(trailing);
   return widget;
 }
-// Keep multi-key shortcuts readable in narrow tiled windows.
-class ShortcutRow final : public QWidget {
-protected:
-  void resizeEvent(QResizeEvent *event) override {
-    QWidget::resizeEvent(event);
-    auto *box = static_cast<QBoxLayout *>(layout());
-    // Measure the complete key group and reserve readable text space. This
-    // follows the actual font instead of assuming one screen or text size.
-    const auto margins = box->contentsMargins();
-    const int textWidth = qMax(box->itemAt(0)->minimumSize().width(),
-                              fontMetrics().averageCharWidth() * 24);
-    const int required = textWidth + box->itemAt(1)->minimumSize().width() +
-                         box->spacing() + margins.left() + margins.right();
-    box->setDirection(width() < required ? QBoxLayout::TopToBottom
-                                        : QBoxLayout::LeftToRight);
-  }
-};
 static QWidget *shortcutRow(const QString &title, bool checked,
                             const QStringList &keys,
                             const QString &subtitle = {},
                             bool implemented = false,
                             const QString &setting = {}) {
-  auto *container = new ShortcutRow;
+  auto *container = new AdaptiveRow;
   container->setMinimumHeight(subtitle.isEmpty() ? 48 : 62);
   auto *layout = new QHBoxLayout(container);
   layout->setContentsMargins(15, 8, 15, 8);
@@ -629,11 +612,11 @@ static QWidget *shortcutRow(const QString &title, bool checked,
   labels->addStretch();
   description->addLayout(labels, 1);
   layout->addLayout(description, 1);
-  auto *keyLayout = new QHBoxLayout;
+  auto *keyGroup = new QWidget;
+  auto *keyLayout = new FlowLayout(keyGroup);
   for (const auto &key : keys)
     keyLayout->addWidget(keyCap(key));
-  keyLayout->addStretch();
-  layout->addLayout(keyLayout);
+  layout->addWidget(keyGroup);
   if (implemented && !setting.isEmpty())
     QObject::connect(check, &QCheckBox::toggled,
                      [setting](bool value) { writeSetting(setting, value); });
@@ -775,16 +758,17 @@ int main(int argc, char **argv) {
   window.setWindowTitle("WeTypeX");
 #endif
   auto *root = new QHBoxLayout(&window);
+  root->setSizeConstraint(QLayout::SetNoConstraint);
   root->setContentsMargins(0, 0, 0, 0);
   root->setSpacing(0);
   auto *sidebar = new QWidget;
   sidebar->setObjectName("sidebar");
-  sidebar->setFixedWidth(211);
   auto *sideLayout = new QVBoxLayout(sidebar);
   sideLayout->setContentsMargins(7, 25, 7, 18);
   sideLayout->setSpacing(8);
   auto *brandRow = new QWidget;
-  brandRow->setFixedHeight(32);
+  brandRow->setObjectName("brandRow");
+  brandRow->setMinimumHeight(32);
   auto *brandLayout = new QHBoxLayout(brandRow);
   brandLayout->setContentsMargins(10, 0, 0, 0);
   brandLayout->setSpacing(8);
@@ -808,17 +792,27 @@ int main(int argc, char **argv) {
   for (int i = 0; i < navNames.size(); ++i) {
     auto *item = new QListWidgetItem(navIcon(navIcons[i]), navNames[i]);
     item->setToolTip(navNames[i]);
-    item->setSizeHint({190, 40});
     navigation->addItem(item);
   }
   sideLayout->addWidget(navigation, 1);
   root->addWidget(sidebar);
   auto *right = new QWidget;
-  right->setObjectName("contentPage");
+  right->setObjectName("settingsContent");
   auto *rightLayout = new QVBoxLayout(right);
   rightLayout->setContentsMargins(0, 0, 0, 0);
   rightLayout->setSpacing(0);
+  auto *compactNavigation = new QComboBox;
+  compactNavigation->setObjectName("compactNavigation");
+  compactNavigation->setAccessibleName("设置页面");
+  compactNavigation->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  compactNavigation->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+  compactNavigation->setModel(navigation->model());
+  QObject::connect(compactNavigation, qOverload<int>(&QComboBox::currentIndexChanged), navigation, qOverload<int>(&QListWidget::setCurrentRow));
+  QObject::connect(navigation, &QListWidget::currentRowChanged, compactNavigation, &QComboBox::setCurrentIndex);
+  compactNavigation->hide();
+  rightLayout->addWidget(compactNavigation);
   auto *pages = new QStackedWidget;
+  pages->setObjectName("settingsPages");
   rightLayout->addWidget(pages, 1);
   root->addWidget(right, 1);
 
@@ -1287,6 +1281,7 @@ int main(int argc, char **argv) {
   auto *defaultShortcut =
       new QLabel("系统默认支持“ctrl + 空格”切换中英文  修改");
   defaultShortcut->setObjectName("rowSubtitle");
+  defaultShortcut->setWordWrap(true);
   shortcuts.body->addWidget(defaultShortcut);
   shortcuts.body->addWidget(rowsCard(
       {row("快捷使用", {}, nullptr, 44),

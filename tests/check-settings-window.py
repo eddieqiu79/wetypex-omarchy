@@ -24,4 +24,4 @@ with tempfile.TemporaryDirectory(prefix='wetypex-gui-test-') as d:
             raise RuntimeError(f'Settings window failed at scale {scale}: {result.returncode}\n{result.stderr}')
     assert not (root/'config/fcitx5/wetypex.json').exists(), 'Opening settings changed preferences'
     assert not (root/'data/fcitx5-wetypex').exists(), 'Opening settings created backend state'
-print('Actual settings window: 5 widths, 2 heights at 100/125/150/200% scale, navigation, no startup engine/account/config writes')
+print('Actual settings window: size sweep, compact/full navigation, 4 scales, no startup engine/account/config writes')

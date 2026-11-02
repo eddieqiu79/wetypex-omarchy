@@ -8,6 +8,49 @@
 class SettingsTests : public QObject {
   Q_OBJECT
 private slots:
+  void keyGroupsWrapWithoutOverlap() {
+    QWidget group;
+    auto *flow = new FlowLayout(&group);
+    for (const auto &text : {"Ctrl", "Shift", "PageDown", "Alt", "Enter", "Tab", "Space"})
+      flow->addWidget(keyCap(text));
+    group.show();
+    for (int points : {10, 19}) {
+      auto font = group.font(); font.setPointSize(points); group.setFont(font);
+      QCoreApplication::processEvents();
+      const int minimum = flow->minimumSize().width();
+      for (int width = minimum; width < minimum + 400; width += 37) {
+        group.resize(width, flow->heightForWidth(width));
+        flow->setGeometry(group.rect());
+        for (int i = 0; i < flow->count(); ++i) {
+          const auto rect = flow->itemAt(i)->geometry();
+          QVERIFY(group.rect().contains(rect));
+          for (int j = 0; j < i; ++j)
+            QVERIFY(!rect.intersects(flow->itemAt(j)->geometry()));
+        }
+      }
+    }
+  }
+  void shortcutReflowsWhenFontChangesWithoutResize() {
+    auto row = std::unique_ptr<QWidget>(shortcutRow("快捷键说明", false,
+                                                  {"Control", "Shift", "PageDown"}));
+    QFont font = row->font();
+    font.setPointSize(10);
+    row->setFont(font);
+    row->ensurePolished();
+    row->setFixedSize(row->sizeHint().width() + 10, 300);
+    const auto original = row->size();
+    row->show();
+    auto *box = qobject_cast<QBoxLayout *>(row->layout());
+    QTRY_COMPARE(box->direction(), QBoxLayout::LeftToRight);
+    font.setPointSize(20);
+    row->setFont(font);
+    QTRY_COMPARE(box->direction(), QBoxLayout::TopToBottom);
+    QCOMPARE(row->size(), original);
+    font.setPointSize(10);
+    row->setFont(font);
+    QTRY_COMPARE(box->direction(), QBoxLayout::LeftToRight);
+    QCOMPARE(row->size(), original);
+  }
   void shortcutLayoutPreservesLongContent() {
     QWidget window;
     QFont font = window.font();
